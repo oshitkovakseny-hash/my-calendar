@@ -1,0 +1,12 @@
+{
+  "name": "Мой календарь",
+  "short_name": "Календарь",
+  "start_url": "/my-calendar/",
+  "display": "standalone",
+  "background_color": "#F2F2F7",
+  "theme_color": "#F2F2F7",
+  "icons": [
+    { "src": "/my-calendar/icon.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/my-calendar/icon.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}
