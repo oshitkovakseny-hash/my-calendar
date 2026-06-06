@@ -558,22 +558,41 @@ function SettingsTab({cycleData, saveCycle, allDaily, streak}) {
   );
 }
 
+function AddRow({onAdd, placeholderName="Название", placeholderAmt="Сумма ₽", hasBorder}) {
+  const [name, setName] = useState("");
+  const [amt, setAmt] = useState("");
+  const add = () => {
+    if (!name.trim()) return;
+    onAdd(name.trim(), amt.trim());
+    setName(""); setAmt("");
+  };
+  return (
+    <div style={{borderTop:hasBorder?`1px solid ${A.sep}`:"none"}}>
+      <div style={{display:"flex",padding:"10px 16px 0",gap:8}}>
+        <input value={name} onChange={e=>setName(e.target.value)} placeholder={placeholderName}
+          style={{flex:2,border:`1px solid ${A.sep}`,background:A.card,borderRadius:10,padding:"10px 12px",fontSize:15,fontFamily:SF,color:A.label,outline:"none",boxSizing:"border-box"}}/>
+        <input value={amt} onChange={e=>setAmt(e.target.value)} placeholder={placeholderAmt} inputMode="decimal"
+          style={{flex:1,border:`1px solid ${A.sep}`,background:A.card,borderRadius:10,padding:"10px 12px",fontSize:15,fontFamily:SF,color:A.label,outline:"none",boxSizing:"border-box"}}/>
+      </div>
+      <div style={{padding:"8px 16px 10px"}}>
+        <button onClick={add} style={{width:"100%",padding:"12px",borderRadius:10,border:"none",background:name.trim()?A.blue:A.label3,color:"#fff",fontSize:15,fontFamily:SF,fontWeight:600,cursor:name.trim()?"pointer":"default"}}>
+          Добавить
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function FinanceTab() {
   const now = new Date();
   const [month, setMonth] = useState({y:now.getFullYear(), m:now.getMonth()});
   const monthKey = `finances-${month.y}-${pad(month.m+1)}`;
 
   const [fixedExpenses, setFixedExpenses] = useState(() => store.get("fixed-expenses") || []);
-  const [monthData, setMonthData] = useState(() => store.get(monthKey) || {income:0, expenses:[]});
-
-  const [newFixedName, setNewFixedName] = useState("");
-  const [newFixedAmt, setNewFixedAmt] = useState("");
-  const [newExpName, setNewExpName] = useState("");
-  const [newExpAmt, setNewExpAmt] = useState("");
+  const [monthData, setMonthData] = useState(() => store.get(monthKey) || {income:"", expenses:[]});
 
   useEffect(() => {
-    const d = store.get(monthKey) || {income:0, expenses:[]};
-    setMonthData(d);
+    setMonthData(store.get(monthKey) || {income:"", expenses:[]});
   }, [monthKey]);
 
   const saveFixed = fe => { setFixedExpenses(fe); store.set("fixed-expenses", fe); };
@@ -582,100 +601,89 @@ function FinanceTab() {
   const prevMonth = () => setMonth(({y,m}) => m===0 ? {y:y-1,m:11} : {y,m:m-1});
   const nextMonth = () => setMonth(({y,m}) => m===11 ? {y:y+1,m:0} : {y,m:m+1});
 
-  const addFixed = () => {
-    if (!newFixedName.trim() || !newFixedAmt) return;
-    saveFixed([...fixedExpenses, {id:Date.now(), name:newFixedName.trim(), amount:parseFloat(newFixedAmt)||0}]);
-    setNewFixedName(""); setNewFixedAmt("");
+  const addFixed = (name, amt) => {
+    const amount = parseFloat(amt.replace(",",".")) || 0;
+    saveFixed([...fixedExpenses, {id:Date.now(), name, amount}]);
   };
   const delFixed = id => saveFixed(fixedExpenses.filter(e=>e.id!==id));
 
-  const addExp = () => {
-    if (!newExpName.trim() || !newExpAmt) return;
-    const exp = {id:Date.now(), name:newExpName.trim(), amount:parseFloat(newExpAmt)||0, date:toKey(new Date())};
+  const addExp = (name, amt) => {
+    const amount = parseFloat(amt.replace(",",".")) || 0;
+    const exp = {id:Date.now(), name, amount, date:toKey(new Date())};
     saveMD({...monthData, expenses:[...(monthData.expenses||[]), exp]});
-    setNewExpName(""); setNewExpAmt("");
   };
   const delExp = id => saveMD({...monthData, expenses:(monthData.expenses||[]).filter(e=>e.id!==id)});
 
-  const fixedTotal = fixedExpenses.reduce((a,e)=>a+e.amount, 0);
-  const varTotal = (monthData.expenses||[]).reduce((a,e)=>a+e.amount, 0);
+  const income = parseFloat(String(monthData.income).replace(",",".")) || 0;
+  const fixedTotal = fixedExpenses.reduce((a,e)=>a+(e.amount||0), 0);
+  const varTotal = (monthData.expenses||[]).reduce((a,e)=>a+(e.amount||0), 0);
   const totalSpent = fixedTotal + varTotal;
-  const balance = (monthData.income||0) - totalSpent;
+  const balance = income - totalSpent;
 
-  const fmtMoney = n => Number(n).toLocaleString("ru-RU");
+  const fmtMoney = n => Number(n||0).toLocaleString("ru-RU");
 
   const generateFinanceReport = () => {
     const win = window.open("","_blank");
     if (!win) return;
     const html = buildFinanceReportHTML(month, monthData, fixedExpenses, fmtMoney);
-    win.document.write(html);
-    win.document.close();
-    win.focus();
+    win.document.write(html); win.document.close(); win.focus();
     setTimeout(()=>win.print(), 400);
   };
 
-  const rowStyle = (last) => ({display:"flex",alignItems:"center",padding:"11px 16px",borderBottom:last?"none":`1px solid ${A.sep}`,minHeight:44});
+  const rowStyle = {display:"flex",alignItems:"center",padding:"12px 16px",borderBottom:`1px solid ${A.sep}`,minHeight:46};
 
   return (
     <div style={{paddingBottom:100}}>
-      <div style={{padding:"16px 20px 8px"}}>
-        <LargeTitle>Финансы</LargeTitle>
-      </div>
-      <div style={{display:"flex",alignItems:"center",gap:8,padding:"0 16px 8px"}}>
-        <button onClick={prevMonth} style={{width:32,height:32,borderRadius:"50%",background:A.bg,border:"none",cursor:"pointer",fontSize:16,color:A.blue}}>‹</button>
+      <div style={{padding:"16px 20px 8px"}}><LargeTitle>Финансы</LargeTitle></div>
+
+      <div style={{display:"flex",alignItems:"center",gap:8,padding:"0 20px 12px"}}>
+        <button onClick={prevMonth} style={{width:36,height:36,borderRadius:"50%",background:A.bg,border:"none",cursor:"pointer",fontSize:18,color:A.blue,display:"flex",alignItems:"center",justifyContent:"center"}}>‹</button>
         <span style={{flex:1,textAlign:"center",fontSize:17,fontFamily:SF,fontWeight:600,color:A.label}}>{MONTHS[month.m]} {month.y}</span>
-        <button onClick={nextMonth} style={{width:32,height:32,borderRadius:"50%",background:A.bg,border:"none",cursor:"pointer",fontSize:16,color:A.blue}}>›</button>
+        <button onClick={nextMonth} style={{width:36,height:36,borderRadius:"50%",background:A.bg,border:"none",cursor:"pointer",fontSize:18,color:A.blue,display:"flex",alignItems:"center",justifyContent:"center"}}>›</button>
       </div>
 
-      <div style={{padding:"8px 16px 0"}}>
-        <SectionHeader>Доходы</SectionHeader>
+      <div style={{padding:"0 16px 0"}}>
+        <SectionHeader>Доходы за месяц</SectionHeader>
         <Card>
-          <div style={{display:"flex",alignItems:"center",padding:"11px 16px"}}>
-            <input type="number" value={monthData.income||""} placeholder="0"
-              onChange={e=>saveMD({...monthData,income:parseFloat(e.target.value)||0})}
-              style={{flex:1,border:"none",background:"transparent",fontSize:20,fontFamily:SF,fontWeight:600,color:A.label,outline:"none",letterSpacing:-0.5}}/>
-            <span style={{fontSize:15,fontFamily:SF,color:A.label2}}>₽ в месяц</span>
+          <div style={{display:"flex",alignItems:"center",padding:"12px 16px",gap:12}}>
+            <input value={monthData.income||""} onChange={e=>saveMD({...monthData,income:e.target.value})}
+              placeholder="0" inputMode="decimal"
+              style={{flex:1,border:`1px solid ${A.sep}`,background:A.bg,borderRadius:10,padding:"10px 12px",fontSize:20,fontFamily:SF,fontWeight:600,color:A.label,outline:"none",letterSpacing:-0.5}}/>
+            <span style={{fontSize:15,fontFamily:SF,color:A.label2,whiteSpace:"nowrap"}}>₽</span>
           </div>
         </Card>
       </div>
 
       <div style={{padding:"20px 16px 0"}}>
-        <SectionHeader>Постоянные расходы</SectionHeader>
+        <SectionHeader>Постоянные расходы (каждый месяц)</SectionHeader>
         <Card>
+          {fixedExpenses.length === 0 && <div style={{padding:"14px 16px",color:A.label2,fontSize:15,fontFamily:SF,textAlign:"center"}}>Нет постоянных расходов</div>}
           {fixedExpenses.map((e,i)=>(
-            <div key={e.id} style={rowStyle(i===fixedExpenses.length-1 && false)}>
+            <div key={e.id} style={{...rowStyle,borderBottom:i<fixedExpenses.length-1?`1px solid ${A.sep}`:"none"}}>
               <span style={{flex:1,fontSize:17,fontFamily:SF,color:A.label}}>{e.name}</span>
-              <span style={{fontSize:15,fontFamily:SF,color:A.label2,marginRight:12}}>{fmtMoney(e.amount)} ₽</span>
-              <button onClick={()=>delFixed(e.id)} style={{color:A.red,background:"none",border:"none",cursor:"pointer",fontSize:18,fontFamily:SF,lineHeight:1,padding:"0 0 0 4px"}}>×</button>
+              <span style={{fontSize:15,fontFamily:SF,color:A.label2,marginRight:16}}>{fmtMoney(e.amount)} ₽</span>
+              <button onClick={()=>delFixed(e.id)} style={{width:28,height:28,borderRadius:"50%",background:A.red+"20",border:"none",cursor:"pointer",color:A.red,fontSize:16,fontWeight:700,display:"flex",alignItems:"center",justifyContent:"center"}}>×</button>
             </div>
           ))}
-          <div style={{display:"flex",alignItems:"center",padding:"10px 16px",borderTop:fixedExpenses.length?`1px solid ${A.sep}`:"none",gap:8}}>
-            <input value={newFixedName} onChange={e=>setNewFixedName(e.target.value)} placeholder="Название" onKeyDown={e=>e.key==="Enter"&&addFixed()}
-              style={{flex:2,border:"none",background:A.bg,borderRadius:8,padding:"7px 10px",fontSize:15,fontFamily:SF,color:A.label,outline:"none"}}/>
-            <input type="number" value={newFixedAmt} onChange={e=>setNewFixedAmt(e.target.value)} placeholder="0 ₽" onKeyDown={e=>e.key==="Enter"&&addFixed()}
-              style={{flex:1,border:"none",background:A.bg,borderRadius:8,padding:"7px 10px",fontSize:15,fontFamily:SF,color:A.label,outline:"none"}}/>
-            <button onClick={addFixed} style={{color:A.blue,background:"none",border:"none",cursor:"pointer",fontSize:14,fontFamily:SF,fontWeight:600,whiteSpace:"nowrap"}}>Добавить</button>
-          </div>
+          <AddRow onAdd={addFixed} placeholderName="Аренда, свет, байк..." placeholderAmt="Сумма ₽" hasBorder={fixedExpenses.length>0}/>
         </Card>
       </div>
 
       <div style={{padding:"20px 16px 0"}}>
         <SectionHeader>Расходы · {MONTHS_G[month.m]}</SectionHeader>
         <Card>
-          {(monthData.expenses||[]).map((e,i)=>(
-            <div key={e.id} style={rowStyle(false)}>
-              <span style={{flex:1,fontSize:17,fontFamily:SF,color:A.label}}>{e.name}</span>
-              <span style={{fontSize:15,fontFamily:SF,color:A.label2,marginRight:12}}>{fmtMoney(e.amount)} ₽</span>
-              <button onClick={()=>delExp(e.id)} style={{color:A.red,background:"none",border:"none",cursor:"pointer",fontSize:18,fontFamily:SF,lineHeight:1,padding:"0 0 0 4px"}}>×</button>
+          {(monthData.expenses||[]).length === 0 && <div style={{padding:"14px 16px",color:A.label2,fontSize:15,fontFamily:SF,textAlign:"center"}}>Расходов нет</div>}
+          {(monthData.expenses||[]).map((e,i,arr)=>(
+            <div key={e.id} style={{...rowStyle,borderBottom:i<arr.length-1?`1px solid ${A.sep}`:"none"}}>
+              <div style={{flex:1}}>
+                <div style={{fontSize:17,fontFamily:SF,color:A.label}}>{e.name}</div>
+                {e.date && <div style={{fontSize:12,fontFamily:SF,color:A.label2,marginTop:2}}>{e.date}</div>}
+              </div>
+              <span style={{fontSize:15,fontFamily:SF,color:A.label2,marginRight:16}}>{fmtMoney(e.amount)} ₽</span>
+              <button onClick={()=>delExp(e.id)} style={{width:28,height:28,borderRadius:"50%",background:A.red+"20",border:"none",cursor:"pointer",color:A.red,fontSize:16,fontWeight:700,display:"flex",alignItems:"center",justifyContent:"center"}}>×</button>
             </div>
           ))}
-          <div style={{display:"flex",alignItems:"center",padding:"10px 16px",borderTop:(monthData.expenses||[]).length?`1px solid ${A.sep}`:"none",gap:8}}>
-            <input value={newExpName} onChange={e=>setNewExpName(e.target.value)} placeholder="Название" onKeyDown={e=>e.key==="Enter"&&addExp()}
-              style={{flex:2,border:"none",background:A.bg,borderRadius:8,padding:"7px 10px",fontSize:15,fontFamily:SF,color:A.label,outline:"none"}}/>
-            <input type="number" value={newExpAmt} onChange={e=>setNewExpAmt(e.target.value)} placeholder="0 ₽" onKeyDown={e=>e.key==="Enter"&&addExp()}
-              style={{flex:1,border:"none",background:A.bg,borderRadius:8,padding:"7px 10px",fontSize:15,fontFamily:SF,color:A.label,outline:"none"}}/>
-            <button onClick={addExp} style={{color:A.blue,background:"none",border:"none",cursor:"pointer",fontSize:14,fontFamily:SF,fontWeight:600,whiteSpace:"nowrap"}}>Добавить</button>
-          </div>
+          <AddRow onAdd={addExp} placeholderName="Продукты, кафе, такси..." placeholderAmt="Сумма ₽" hasBorder={(monthData.expenses||[]).length>0}/>
         </Card>
       </div>
 
@@ -683,17 +691,20 @@ function FinanceTab() {
         <SectionHeader>Итого</SectionHeader>
         <Card>
           {[
-            ["Доходы", fmtMoney(monthData.income||0)+" ₽", A.green],
+            ["Доходы", fmtMoney(income)+" ₽", A.green],
             ["Постоянные расходы", fmtMoney(fixedTotal)+" ₽", A.label],
             ["Переменные расходы", fmtMoney(varTotal)+" ₽", A.label],
             ["Всего потрачено", fmtMoney(totalSpent)+" ₽", A.red],
-            ["Остаток", fmtMoney(balance)+" ₽", balance>=0?A.green:A.red],
-          ].map(([label,val,color],i,arr)=>(
-            <div key={label} style={{display:"flex",alignItems:"center",padding:"11px 16px",borderBottom:i<arr.length-1?`1px solid ${A.sep}`:"none"}}>
-              <span style={{flex:1,fontSize:label==="Остаток"?17:15,fontFamily:SF,fontWeight:label==="Остаток"?600:400,color:A.label}}>{label}</span>
-              <span style={{fontSize:label==="Остаток"?17:15,fontFamily:SF,fontWeight:label==="Остаток"?700:400,color}}>{val}</span>
+          ].map(([label,val,color],i)=>(
+            <div key={label} style={{display:"flex",alignItems:"center",padding:"11px 16px",borderBottom:`1px solid ${A.sep}`}}>
+              <span style={{flex:1,fontSize:15,fontFamily:SF,color:A.label}}>{label}</span>
+              <span style={{fontSize:15,fontFamily:SF,color}}>{val}</span>
             </div>
           ))}
+          <div style={{display:"flex",alignItems:"center",padding:"14px 16px"}}>
+            <span style={{flex:1,fontSize:17,fontFamily:SF,fontWeight:600,color:A.label}}>Остаток</span>
+            <span style={{fontSize:20,fontFamily:SF,fontWeight:700,color:balance>=0?A.green:A.red}}>{balance>=0?"+":""}{fmtMoney(balance)} ₽</span>
+          </div>
         </Card>
       </div>
 
