@@ -334,89 +334,6 @@ function CalendarTab({allDaily, cycleData, saveDayData}) {
   );
 }
 
-function ReportTab({allDaily, cycleData}) {
-  const today = new Date(), ago = new Date();
-  ago.setDate(ago.getDate()-29);
-  const [from, setFrom] = useState(toKey(ago));
-  const [to, setTo] = useState(toKey(today));
-
-  const setPreset = days => { const f=new Date(); f.setDate(f.getDate()-(days-1)); setFrom(toKey(f)); setTo(toKey(new Date())); };
-  const setThisMonth = () => { const n=new Date(); setFrom(toKey(new Date(n.getFullYear(),n.getMonth(),1))); setTo(toKey(n)); };
-
-  const daysInRange = (() => {
-    const out=[]; const f=parseKey(from), t=parseKey(to);
-    if(f>t) return out;
-    let d=new Date(f);
-    while(d<=t){ const k=toKey(d); if(allDaily[k]) out.push(k); d.setDate(d.getDate()+1); }
-    return out;
-  })();
-
-  const goodN  = daysInRange.filter(k=>allDaily[k]?.eating===true).length;
-  const sportN = daysInRange.filter(k=>allDaily[k]?.sport?.done).length;
-  const taskN  = daysInRange.reduce((a,k)=>a+(allDaily[k]?.todos||[]).filter(t=>t.done).length, 0);
-
-  const fmt = k => { const dt=parseKey(k); return `${dt.getDate()} ${MONTHS_G[dt.getMonth()]} ${dt.getFullYear()}, ${WEEKDAYS[dt.getDay()]}`; };
-
-  const generate = () => {
-    const win = window.open("","_blank");
-    if (!win) { window.print(); return; }
-    const html = buildReportHTML(daysInRange, allDaily, cycleData, from, to, fmt, goodN, sportN, taskN);
-    win.document.write(html);
-    win.document.close();
-    win.focus();
-    setTimeout(()=>win.print(), 400);
-  };
-
-  return (
-    <div style={{paddingBottom:100}}>
-      <div style={{padding:"16px 20px 8px"}}>
-        <LargeTitle>Отчёт</LargeTitle>
-        <div style={{fontSize:15,fontFamily:SF,color:A.label2,marginTop:4,lineHeight:"20px"}}>Дневник за период — задачи, тренировки, фаза цикла, состояние.</div>
-      </div>
-      <div style={{padding:"12px 16px 0"}}>
-        <SectionHeader>Период</SectionHeader>
-        <Card>
-          <div style={{display:"flex",alignItems:"center",padding:"12px 16px",borderBottom:`1px solid ${A.sep}`}}>
-            <span style={{flex:1,fontSize:17,fontFamily:SF,color:A.label}}>С</span>
-            <input type="date" value={from} onChange={e=>setFrom(e.target.value)} style={{border:"none",background:A.bg,borderRadius:8,padding:"6px 10px",fontSize:16,fontFamily:SF,color:A.blue}}/>
-          </div>
-          <div style={{display:"flex",alignItems:"center",padding:"12px 16px"}}>
-            <span style={{flex:1,fontSize:17,fontFamily:SF,color:A.label}}>По</span>
-            <input type="date" value={to} onChange={e=>setTo(e.target.value)} style={{border:"none",background:A.bg,borderRadius:8,padding:"6px 10px",fontSize:16,fontFamily:SF,color:A.blue}}/>
-          </div>
-        </Card>
-        <div style={{display:"flex",gap:8,marginTop:10,flexWrap:"wrap"}}>
-          {[["7 дней",()=>setPreset(7)],["30 дней",()=>setPreset(30)],["Этот месяц",setThisMonth]].map(([l,fn])=>(
-            <button key={l} onClick={fn} style={{padding:"7px 14px",borderRadius:16,border:"none",background:A.card,cursor:"pointer",fontSize:14,fontFamily:SF,color:A.blue,fontWeight:500}}>{l}</button>
-          ))}
-        </div>
-      </div>
-      <div style={{padding:"20px 16px 0"}}>
-        <SectionHeader>Что войдёт в отчёт</SectionHeader>
-        <Card>
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",textAlign:"center"}}>
-            {[[daysInRange.length,"дней",A.label],[goodN,"в балансе",A.green],[sportN,"тренировок",A.blue]].map(([n,l,c],i)=>(
-              <div key={l} style={{padding:"16px 8px",borderRight:i<2?`1px solid ${A.sep}`:"none"}}>
-                <div style={{fontSize:28,fontWeight:700,fontFamily:SF,color:c,letterSpacing:-0.5}}>{n}</div>
-                <div style={{fontSize:12,fontFamily:SF,color:A.label2,marginTop:2}}>{l}</div>
-              </div>
-            ))}
-          </div>
-          <div style={{padding:"10px 16px",borderTop:`1px solid ${A.sep}`,fontSize:13,fontFamily:SF,color:A.label2}}>Выполнено задач: {taskN}</div>
-        </Card>
-      </div>
-      <div style={{padding:"24px 16px 0"}}>
-        <button onClick={generate} disabled={!daysInRange.length} style={{width:"100%",padding:"15px",borderRadius:14,border:"none",background:daysInRange.length?A.blue:A.label3,color:"#fff",fontSize:17,fontWeight:600,fontFamily:SF,cursor:daysInRange.length?"pointer":"default"}}>
-          Создать PDF
-        </button>
-        <div style={{fontSize:13,fontFamily:SF,color:A.label2,textAlign:"center",marginTop:10,lineHeight:"18px",padding:"0 8px"}}>
-          Откроется окно печати — выбери «Сохранить в PDF».
-        </div>
-      </div>
-    </div>
-  );
-}
-
 function buildReportHTML(daysInRange, allDaily, cycleData, from, to, fmt, goodN, sportN, taskN) {
   const rows = daysInRange.map(k => {
     const v = allDaily[k], phase = getCyclePhase(parseKey(k), cycleData);
@@ -465,6 +382,33 @@ function SettingsTab({cycleData, saveCycle, allDaily, streak}) {
   const last30 = Object.keys(allDaily).filter(k=>{const d=new Date(k),ref=new Date();ref.setDate(ref.getDate()-30);return d>=ref;});
   const goodDays=last30.filter(k=>allDaily[k]?.eating===true).length;
   const sportDays=last30.filter(k=>allDaily[k]?.sport?.done).length;
+
+  const rNow = new Date(), rAgo = new Date();
+  rAgo.setDate(rAgo.getDate()-29);
+  const [rFrom, setRFrom] = useState(toKey(rAgo));
+  const [rTo, setRTo] = useState(toKey(rNow));
+  const setPreset = days => { const f=new Date(); f.setDate(f.getDate()-(days-1)); setRFrom(toKey(f)); setRTo(toKey(new Date())); };
+  const setThisMonth = () => { const n=new Date(); setRFrom(toKey(new Date(n.getFullYear(),n.getMonth(),1))); setRTo(toKey(n)); };
+
+  const daysInRange = (() => {
+    const out=[]; const f=parseKey(rFrom), t=parseKey(rTo);
+    if(f>t) return out;
+    let d=new Date(f);
+    while(d<=t){ const k=toKey(d); if(allDaily[k]) out.push(k); d.setDate(d.getDate()+1); }
+    return out;
+  })();
+  const rGoodN  = daysInRange.filter(k=>allDaily[k]?.eating===true).length;
+  const rSportN = daysInRange.filter(k=>allDaily[k]?.sport?.done).length;
+  const rTaskN  = daysInRange.reduce((a,k)=>a+(allDaily[k]?.todos||[]).filter(t=>t.done).length, 0);
+  const fmt = k => { const dt=parseKey(k); return `${dt.getDate()} ${MONTHS_G[dt.getMonth()]} ${dt.getFullYear()}, ${WEEKDAYS[dt.getDay()]}`; };
+
+  const generateUnified = () => {
+    const win = window.open("","_blank");
+    if (!win) { window.print(); return; }
+    const html = buildUnifiedReportHTML(daysInRange, allDaily, cycleData, rFrom, rTo, fmt, rGoodN, rSportN, rTaskN);
+    win.document.write(html); win.document.close(); win.focus();
+    setTimeout(()=>win.print(), 400);
+  };
 
   return (
     <div style={{paddingBottom:100}}>
@@ -531,6 +475,42 @@ function SettingsTab({cycleData, saveCycle, allDaily, streak}) {
           </div>
         </Card>
       </div>
+      <div style={{padding:"20px 16px 0"}}>
+        <SectionHeader>Отчёт</SectionHeader>
+        <Card>
+          <div style={{display:"flex",alignItems:"center",padding:"12px 16px",borderBottom:`1px solid ${A.sep}`}}>
+            <span style={{flex:1,fontSize:17,fontFamily:SF,color:A.label}}>С</span>
+            <input type="date" value={rFrom} onChange={e=>setRFrom(e.target.value)} style={{border:"none",background:A.bg,borderRadius:8,padding:"6px 10px",fontSize:16,fontFamily:SF,color:A.blue}}/>
+          </div>
+          <div style={{display:"flex",alignItems:"center",padding:"12px 16px"}}>
+            <span style={{flex:1,fontSize:17,fontFamily:SF,color:A.label}}>По</span>
+            <input type="date" value={rTo} onChange={e=>setRTo(e.target.value)} style={{border:"none",background:A.bg,borderRadius:8,padding:"6px 10px",fontSize:16,fontFamily:SF,color:A.blue}}/>
+          </div>
+        </Card>
+        <div style={{display:"flex",gap:8,marginTop:10,flexWrap:"wrap"}}>
+          {[["7 дней",()=>setPreset(7)],["30 дней",()=>setPreset(30)],["Этот месяц",setThisMonth]].map(([l,fn])=>(
+            <button key={l} onClick={fn} style={{padding:"7px 14px",borderRadius:16,border:"none",background:A.card,cursor:"pointer",fontSize:14,fontFamily:SF,color:A.blue,fontWeight:500}}>{l}</button>
+          ))}
+        </div>
+        {daysInRange.length > 0 && (
+          <Card style={{marginTop:10}}>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",textAlign:"center"}}>
+              {[[daysInRange.length,"дней",A.label],[rGoodN,"в балансе",A.green],[rSportN,"трениров.",A.blue]].map(([n,l,c],i)=>(
+                <div key={l} style={{padding:"14px 8px",borderRight:i<2?`1px solid ${A.sep}`:"none"}}>
+                  <div style={{fontSize:26,fontWeight:700,fontFamily:SF,color:c,letterSpacing:-0.5}}>{n}</div>
+                  <div style={{fontSize:11,fontFamily:SF,color:A.label2,marginTop:2}}>{l}</div>
+                </div>
+              ))}
+            </div>
+            <div style={{padding:"8px 16px",borderTop:`1px solid ${A.sep}`,fontSize:13,fontFamily:SF,color:A.label2}}>Задач выполнено: {rTaskN}</div>
+          </Card>
+        )}
+        <button onClick={generateUnified} disabled={!daysInRange.length} style={{marginTop:12,width:"100%",padding:"15px",borderRadius:14,border:"none",background:daysInRange.length?A.blue:A.label3,color:"#fff",fontSize:17,fontWeight:600,fontFamily:SF,cursor:daysInRange.length?"pointer":"default"}}>
+          Создать общий отчёт (PDF)
+        </button>
+        {!daysInRange.length && <div style={{fontSize:13,fontFamily:SF,color:A.label2,textAlign:"center",marginTop:8}}>Нет данных за выбранный период</div>}
+      </div>
+
       <div style={{padding:"20px 16px 0"}}>
         <SectionHeader>Цикл</SectionHeader>
         <Card>
@@ -623,14 +603,6 @@ function FinanceTab() {
 
   const fmtMoney = n => Number(n||0).toLocaleString("ru-RU");
 
-  const generateFinanceReport = () => {
-    const win = window.open("","_blank");
-    if (!win) return;
-    const html = buildFinanceReportHTML(month, monthData, fixedExpenses, fmtMoney);
-    win.document.write(html); win.document.close(); win.focus();
-    setTimeout(()=>win.print(), 400);
-  };
-
   const rowStyle = {display:"flex",alignItems:"center",padding:"12px 16px",borderBottom:`1px solid ${A.sep}`,minHeight:46};
 
   return (
@@ -712,11 +684,6 @@ function FinanceTab() {
         </Card>
       </div>
 
-      <div style={{padding:"24px 16px 0"}}>
-        <button onClick={generateFinanceReport} style={{width:"100%",padding:"15px",borderRadius:14,border:"none",background:A.blue,color:"#fff",fontSize:17,fontWeight:600,fontFamily:SF,cursor:"pointer"}}>
-          Создать отчёт
-        </button>
-      </div>
     </div>
   );
 }
@@ -745,6 +712,77 @@ function buildFinanceReportHTML(month, monthData, fixedExpenses, fmtMoney) {
     <tfoot><tr><td><b>Итого</b></td><td style="text-align:right;"><b>${fmtMoney(varTotal)} ₽</b></td><td></td></tr></tfoot></table>
     <div style="font-size:16px;margin-bottom:6px;">Всего потрачено: <b>${fmtMoney(totalSpent)} ₽</b></div>
     <div style="font-size:18px;margin-bottom:20px;">Остаток: <b style="color:${balColor};">${fmtMoney(balance)} ₽</b></div>
+    </body></html>`;
+}
+
+function buildUnifiedReportHTML(daysInRange, allDaily, cycleData, from, to, fmt, goodN, sportN, taskN) {
+  const fmtMoney = n => Number(n||0).toLocaleString("ru-RU");
+
+  const diaryRows = daysInRange.map(k => {
+    const v = allDaily[k], phase = getCyclePhase(parseKey(k), cycleData);
+    const work = (v.todos||[]).filter(x=>x.tag==="work");
+    const pers = (v.todos||[]).filter(x=>x.tag==="personal");
+    const untagged = (v.todos||[]).filter(x=>!x.tag);
+    return `
+      <div style="margin-bottom:18px;page-break-inside:avoid;">
+        <div style="display:flex;justify-content:space-between;align-items:baseline;border-bottom:1px solid #000;padding-bottom:4px;margin-bottom:8px;">
+          <b style="font-size:15px;">${fmt(k)}</b>
+          <span style="color:#555;font-size:13px;">${phase?`${phase.label} · день ${phase.day}`:""}</span>
+        </div>
+        <div style="font-size:13px;color:#333;margin-bottom:6px;">
+          Питание: ${v.eating===true?"в порядке ✓":v.eating===false?"трудный день":"—"}
+          &nbsp;·&nbsp;
+          Спорт: ${v.sport?.done?(v.sport.type||"да"):"нет"}
+        </div>
+        ${work.length?`<div style="margin-bottom:4px;"><div style="font-size:11px;color:#888;text-transform:uppercase;margin-bottom:2px;">Работа</div>${work.map(x=>`<div style="font-size:14px;margin-left:8px;">${x.done?"☑":"☐"} ${x.text}${x.note?` — <i>${x.note}</i>`:""}</div>`).join("")}</div>`:""}
+        ${pers.length?`<div style="margin-bottom:4px;"><div style="font-size:11px;color:#888;text-transform:uppercase;margin-bottom:2px;">Личное</div>${pers.map(x=>`<div style="font-size:14px;margin-left:8px;">${x.done?"☑":"☐"} ${x.text}${x.note?` — <i>${x.note}</i>`:""}</div>`).join("")}</div>`:""}
+        ${untagged.length?`<div style="margin-bottom:4px;"><div style="font-size:11px;color:#888;text-transform:uppercase;margin-bottom:2px;">Другое</div>${untagged.map(x=>`<div style="font-size:14px;margin-left:8px;">${x.done?"☑":"☐"} ${x.text}${x.note?` — <i>${x.note}</i>`:""}</div>`).join("")}</div>`:""}
+        ${v.notes?`<div style="font-size:13px;color:#333;margin-top:4px;font-style:italic;">Заметка: ${v.notes}</div>`:""}
+      </div>`;
+  }).join("");
+
+  const fromDate = parseKey(from), toDate = parseKey(to);
+  const monthsInRange = new Set();
+  let d = new Date(fromDate);
+  while (d <= toDate) { monthsInRange.add(`${d.getFullYear()}-${pad(d.getMonth()+1)}`); d.setMonth(d.getMonth()+1); }
+
+  let financeHTML = "";
+  for (const mk of [...monthsInRange].sort()) {
+    try {
+      const md = JSON.parse(localStorage.getItem(`finances-${mk}`));
+      const fe = JSON.parse(localStorage.getItem("fixed-expenses")) || [];
+      if (!md && !fe?.length) continue;
+      const [fy,fm] = mk.split("-").map(Number);
+      const income = parseFloat(String((md?.income)||0).replace(",",".")) || 0;
+      const fixedTotal = (fe||[]).reduce((a,e)=>a+(e.amount||0),0);
+      const varTotal = (md?.expenses||[]).reduce((a,e)=>a+(e.amount||0),0);
+      const balance = income - fixedTotal - varTotal;
+      financeHTML += `
+        <div style="margin-bottom:20px;page-break-inside:avoid;">
+          <h3 style="font-size:16px;margin:0 0 8px;">${MONTHS[fm-1]} ${fy}</h3>
+          <div style="font-size:14px;margin-bottom:4px;">Доходы: <b style="color:#34C759;">${fmtMoney(income)} ₽</b></div>
+          <div style="font-size:14px;margin-bottom:4px;">Постоянные расходы: ${fmtMoney(fixedTotal)} ₽</div>
+          <div style="font-size:14px;margin-bottom:4px;">Переменные расходы: ${fmtMoney(varTotal)} ₽</div>
+          <div style="font-size:14px;">Остаток: <b style="color:${balance>=0?"#34C759":"#FF3B30"};">${balance>=0?"+":""}${fmtMoney(balance)} ₽</b></div>
+          ${(md?.expenses||[]).length?`<div style="margin-top:8px;font-size:12px;color:#888;text-transform:uppercase;margin-bottom:4px;">Расходы</div>${(md.expenses).map(e=>`<div style="font-size:13px;padding:3px 0;border-bottom:1px solid #eee;">${e.name} — ${fmtMoney(e.amount)} ₽${e.date?` <span style="color:#aaa">${e.date}</span>`:""}</div>`).join("")}`:""}
+        </div>`;
+    } catch {}
+  }
+
+  return `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Отчёт ${from} — ${to}</title>
+    <style>body{font-family:-apple-system,Helvetica,sans-serif;padding:24px;color:#000;}h2{font-size:18px;margin:24px 0 12px;padding-top:12px;border-top:2px solid #000;}@page{margin:1.4cm;}</style>
+    </head><body>
+    <h1 style="font-size:24px;margin:0 0 4px;">Отчёт</h1>
+    <div style="color:#555;margin-bottom:20px;">Период: ${fmt(from)} — ${fmt(to)}</div>
+    <div style="display:flex;gap:24px;padding:12px 0;border-top:2px solid #000;border-bottom:1px solid #ccc;margin-bottom:24px;">
+      <div><b style="font-size:20px;">${daysInRange.length}</b> дней</div>
+      <div><b style="font-size:20px;">${goodN}</b> в балансе</div>
+      <div><b style="font-size:20px;">${sportN}</b> тренировок</div>
+      <div><b style="font-size:20px;">${taskN}</b> задач выполнено</div>
+    </div>
+    <h2>Дневник состояния и задачи</h2>
+    ${diaryRows || "<div style='color:#888;'>Нет данных за выбранный период.</div>"}
+    ${financeHTML ? `<h2>Финансы</h2>${financeHTML}` : ""}
     </body></html>`;
 }
 
@@ -871,7 +909,6 @@ export default function App() {
   const tabs = [
     {id:"today",    icon:"◉", label:"Сегодня"},
     {id:"calendar", icon:"▦", label:"Календарь"},
-    {id:"report",   icon:"▤", label:"Отчёт"},
     {id:"finance",  icon:"◈", label:"Финансы"},
     {id:"wishlist", icon:"♡", label:"Вишлист"},
     {id:"settings", icon:"⚙", label:"Настройки"},
@@ -893,7 +930,6 @@ export default function App() {
         <div style={{flex:1,overflowY:"auto",paddingBottom:84}}>
           {tab==="today"    && <TodayTab    dayData={todayData} onSave={d=>saveDayData(today,d)} allDaily={allDaily} streak={streak} cycleData={cycleData}/>}
           {tab==="calendar" && <CalendarTab allDaily={allDaily} cycleData={cycleData} saveDayData={saveDayData}/>}
-          {tab==="report"   && <ReportTab   allDaily={allDaily} cycleData={cycleData}/>}
           {tab==="settings" && <SettingsTab cycleData={cycleData} saveCycle={saveCycle} allDaily={allDaily} streak={streak}/>}
           {tab==="finance"  && <FinanceTab/>}
           {tab==="wishlist" && <WishlistTab/>}
