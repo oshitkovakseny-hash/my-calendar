@@ -530,14 +530,11 @@ function FinanceTab() {
 
   const [fixedExpenses, setFixedExpenses] = useState(() => store.get("fixed-expenses") || []);
   const [monthData, setMonthData] = useState(() => store.get(monthKey) || {income:0, expenses:[]});
-  const [wishlist, setWishlist] = useState(() => store.get("wishlist") || []);
 
   const [newFixedName, setNewFixedName] = useState("");
   const [newFixedAmt, setNewFixedAmt] = useState("");
   const [newExpName, setNewExpName] = useState("");
   const [newExpAmt, setNewExpAmt] = useState("");
-  const [newWishName, setNewWishName] = useState("");
-  const [expandedWish, setExpandedWish] = useState(null);
 
   useEffect(() => {
     const d = store.get(monthKey) || {income:0, expenses:[]};
@@ -546,7 +543,6 @@ function FinanceTab() {
 
   const saveFixed = fe => { setFixedExpenses(fe); store.set("fixed-expenses", fe); };
   const saveMD = md => { setMonthData(md); store.set(monthKey, md); };
-  const saveWish = wl => { setWishlist(wl); store.set("wishlist", wl); };
 
   const prevMonth = () => setMonth(({y,m}) => m===0 ? {y:y-1,m:11} : {y,m:m-1});
   const nextMonth = () => setMonth(({y,m}) => m===11 ? {y:y+1,m:0} : {y,m:m+1});
@@ -566,15 +562,6 @@ function FinanceTab() {
   };
   const delExp = id => saveMD({...monthData, expenses:(monthData.expenses||[]).filter(e=>e.id!==id)});
 
-  const addWish = () => {
-    if (!newWishName.trim()) return;
-    const w = {id:Date.now(), name:newWishName.trim(), price:"", link:"", note:""};
-    saveWish([w, ...wishlist]);
-    setNewWishName(""); setExpandedWish(w.id);
-  };
-  const delWish = id => { saveWish(wishlist.filter(w=>w.id!==id)); setExpandedWish(null); };
-  const updateWish = (id, field, val) => saveWish(wishlist.map(w=>w.id===id?{...w,[field]:val}:w));
-
   const fixedTotal = fixedExpenses.reduce((a,e)=>a+e.amount, 0);
   const varTotal = (monthData.expenses||[]).reduce((a,e)=>a+e.amount, 0);
   const totalSpent = fixedTotal + varTotal;
@@ -585,7 +572,7 @@ function FinanceTab() {
   const generateFinanceReport = () => {
     const win = window.open("","_blank");
     if (!win) return;
-    const html = buildFinanceReportHTML(month, monthData, fixedExpenses, wishlist, fmtMoney);
+    const html = buildFinanceReportHTML(month, monthData, fixedExpenses, fmtMoney);
     win.document.write(html);
     win.document.close();
     win.focus();
@@ -675,50 +662,6 @@ function FinanceTab() {
         </Card>
       </div>
 
-      <div style={{padding:"20px 16px 0"}}>
-        <SectionHeader>Вишлист</SectionHeader>
-        <Card>
-          <div style={{display:"flex",alignItems:"center",padding:"10px 16px",borderBottom:`1px solid ${A.sep}`,gap:8}}>
-            <input value={newWishName} onChange={e=>setNewWishName(e.target.value)} placeholder="Новый пункт..." onKeyDown={e=>e.key==="Enter"&&addWish()}
-              style={{flex:1,border:"none",background:A.bg,borderRadius:8,padding:"7px 10px",fontSize:15,fontFamily:SF,color:A.label,outline:"none"}}/>
-            <button onClick={addWish} style={{color:A.blue,background:"none",border:"none",cursor:"pointer",fontSize:14,fontFamily:SF,fontWeight:600}}>Добавить</button>
-          </div>
-          {wishlist.length===0 && <div style={{padding:"14px 16px",textAlign:"center",color:A.label2,fontSize:15,fontFamily:SF}}>Список пуст</div>}
-          {wishlist.map((w,i)=>{
-            const isOpen = expandedWish === w.id;
-            return (
-              <div key={w.id} style={{borderBottom:i<wishlist.length-1||isOpen?`1px solid ${A.sep}`:"none"}}>
-                <div style={{display:"flex",alignItems:"center",padding:"11px 16px",cursor:"pointer"}} onClick={()=>setExpandedWish(isOpen?null:w.id)}>
-                  <div style={{flex:1,minWidth:0}}>
-                    <div style={{fontSize:17,fontFamily:SF,color:A.label,letterSpacing:-0.41}}>{w.name}</div>
-                    {w.price && <div style={{fontSize:13,fontFamily:SF,color:A.label2,marginTop:1}}>{fmtMoney(w.price)} ₽</div>}
-                  </div>
-                  {w.link && <span style={{fontSize:14,color:A.blue,marginRight:8}}>🔗</span>}
-                  <button onClick={e=>{e.stopPropagation();setExpandedWish(isOpen?null:w.id);}} style={{background:"none",border:"none",cursor:"pointer",color:A.label2,fontSize:18,lineHeight:1,transform:isOpen?"rotate(90deg)":"none",transition:"transform .15s"}}>›</button>
-                </div>
-                {isOpen && (
-                  <div style={{padding:"0 16px 14px",background:A.bg}}>
-                    <div style={{fontSize:12,color:A.label2,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:6}}>Название</div>
-                    <input value={w.name} onChange={e=>updateWish(w.id,"name",e.target.value)}
-                      style={{width:"100%",background:A.card,border:`1px solid ${A.sep}`,borderRadius:10,padding:"10px 12px",fontSize:15,fontFamily:SF,color:A.label,boxSizing:"border-box",outline:"none",display:"block",marginBottom:10}}/>
-                    <div style={{fontSize:12,color:A.label2,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:6}}>Цена</div>
-                    <input type="number" value={w.price} onChange={e=>updateWish(w.id,"price",e.target.value)} placeholder="0"
-                      style={{width:"100%",background:A.card,border:`1px solid ${A.sep}`,borderRadius:10,padding:"10px 12px",fontSize:15,fontFamily:SF,color:A.label,boxSizing:"border-box",outline:"none",display:"block",marginBottom:10}}/>
-                    <div style={{fontSize:12,color:A.label2,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:6}}>Ссылка</div>
-                    <input value={w.link} onChange={e=>updateWish(w.id,"link",e.target.value)} placeholder="https://..."
-                      style={{width:"100%",background:A.card,border:`1px solid ${A.sep}`,borderRadius:10,padding:"10px 12px",fontSize:15,fontFamily:SF,color:A.blue,boxSizing:"border-box",outline:"none",display:"block",marginBottom:10}}/>
-                    <div style={{fontSize:12,color:A.label2,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:6}}>Заметка</div>
-                    <textarea value={w.note} onChange={e=>updateWish(w.id,"note",e.target.value)} placeholder="Описание, где купить..." rows={2}
-                      style={{width:"100%",background:A.card,border:`1px solid ${A.sep}`,borderRadius:10,padding:"10px 12px",fontSize:15,fontFamily:SF,color:A.label,resize:"none",boxSizing:"border-box",lineHeight:"20px",outline:"none",display:"block",marginBottom:12}}/>
-                    <button onClick={()=>delWish(w.id)} style={{color:A.red,background:"none",border:"none",cursor:"pointer",fontSize:15,fontFamily:SF,padding:0}}>Удалить</button>
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </Card>
-      </div>
-
       <div style={{padding:"24px 16px 0"}}>
         <button onClick={generateFinanceReport} style={{width:"100%",padding:"15px",borderRadius:14,border:"none",background:A.blue,color:"#fff",fontSize:17,fontWeight:600,fontFamily:SF,cursor:"pointer"}}>
           Создать отчёт
@@ -728,7 +671,7 @@ function FinanceTab() {
   );
 }
 
-function buildFinanceReportHTML(month, monthData, fixedExpenses, wishlist, fmtMoney) {
+function buildFinanceReportHTML(month, monthData, fixedExpenses, fmtMoney) {
   const title = `Финансы · ${MONTHS[month.m]} ${month.y}`;
   const fixedTotal = fixedExpenses.reduce((a,e)=>a+e.amount,0);
   const varTotal = (monthData.expenses||[]).reduce((a,e)=>a+e.amount,0);
@@ -738,7 +681,6 @@ function buildFinanceReportHTML(month, monthData, fixedExpenses, wishlist, fmtMo
 
   const fixedRows = fixedExpenses.map(e=>`<tr><td>${e.name}</td><td style="text-align:right;">${fmtMoney(e.amount)} ₽</td></tr>`).join("") || `<tr><td colspan="2" style="color:#888;">Нет данных</td></tr>`;
   const varRows = (monthData.expenses||[]).map(e=>`<tr><td>${e.name}</td><td style="text-align:right;">${fmtMoney(e.amount)} ₽</td><td style="color:#888;font-size:12px;">${e.date||""}</td></tr>`).join("") || `<tr><td colspan="3" style="color:#888;">Нет данных</td></tr>`;
-  const wishRows = wishlist.length ? wishlist.map(w=>`<li>${w.name}${w.price?` — ${fmtMoney(w.price)} ₽`:""}${w.link?` <a href="${w.link}">${w.link}</a>`:""}</li>`).join("") : "<li>Пусто</li>";
 
   return `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${title}</title>
     <style>body{font-family:-apple-system,Helvetica,sans-serif;padding:24px;color:#000;}table{width:100%;border-collapse:collapse;margin-bottom:16px;}th{text-align:left;font-size:12px;color:#888;text-transform:uppercase;padding:4px 0;border-bottom:1px solid #ccc;}td{padding:6px 0;border-bottom:1px solid #eee;font-size:14px;}@page{margin:1.4cm;}</style>
@@ -753,9 +695,102 @@ function buildFinanceReportHTML(month, monthData, fixedExpenses, wishlist, fmtMo
     <tfoot><tr><td><b>Итого</b></td><td style="text-align:right;"><b>${fmtMoney(varTotal)} ₽</b></td><td></td></tr></tfoot></table>
     <div style="font-size:16px;margin-bottom:6px;">Всего потрачено: <b>${fmtMoney(totalSpent)} ₽</b></div>
     <div style="font-size:18px;margin-bottom:20px;">Остаток: <b style="color:${balColor};">${fmtMoney(balance)} ₽</b></div>
-    <h2 style="font-size:16px;margin:0 0 8px;">Вишлист</h2>
-    <ul style="font-size:14px;padding-left:20px;">${wishRows}</ul>
     </body></html>`;
+}
+
+function WishlistTab() {
+  const [wishlist, setWishlist] = useState(() => store.get("wishlist") || []);
+  const [newWishName, setNewWishName] = useState("");
+  const [expandedWish, setExpandedWish] = useState(null);
+
+  const saveWish = wl => { setWishlist(wl); store.set("wishlist", wl); };
+
+  const addWish = () => {
+    if (!newWishName.trim()) return;
+    const w = {id:Date.now(), name:newWishName.trim(), price:"", link:"", photo:"", plannedDate:"", bought:false};
+    saveWish([w, ...wishlist]);
+    setNewWishName(""); setExpandedWish(w.id);
+  };
+  const delWish = id => { saveWish(wishlist.filter(w=>w.id!==id)); setExpandedWish(null); };
+  const updateWish = (id, field, val) => saveWish(wishlist.map(w=>w.id===id?{...w,[field]:val}:w));
+
+  return (
+    <div style={{paddingBottom:100}}>
+      <div style={{padding:"16px 20px 4px"}}>
+        <LargeTitle>Вишлист</LargeTitle>
+        <div style={{fontSize:13,fontFamily:SF,color:A.label2,marginTop:4}}>Всё, что хочется купить</div>
+      </div>
+
+      <div style={{padding:"16px 16px 0"}}>
+        <Card>
+          <div style={{display:"flex",alignItems:"center",padding:"10px 16px",gap:8}}>
+            <input value={newWishName} onChange={e=>setNewWishName(e.target.value)} placeholder="Что хочу купить..." onKeyDown={e=>e.key==="Enter"&&addWish()}
+              style={{flex:1,border:"none",background:"transparent",fontSize:17,fontFamily:SF,color:A.label,outline:"none",letterSpacing:-0.41}}/>
+            <button onClick={addWish} style={{color:A.blue,background:"none",border:"none",cursor:"pointer",fontSize:15,fontFamily:SF,fontWeight:600,whiteSpace:"nowrap"}}>Добавить</button>
+          </div>
+        </Card>
+      </div>
+
+      <div style={{padding:"16px 16px 0"}}>
+        {wishlist.length === 0 && (
+          <div style={{textAlign:"center",color:A.label2,fontSize:15,fontFamily:SF,padding:"32px 0"}}>Список пуст</div>
+        )}
+        {wishlist.length > 0 && (
+          <Card>
+            {wishlist.map((w, i) => {
+              const isOpen = expandedWish === w.id;
+              return (
+                <div key={w.id} style={{borderBottom:i<wishlist.length-1||isOpen?`1px solid ${A.sep}`:"none"}}>
+                  <div style={{display:"flex",alignItems:"center",padding:"11px 16px",minHeight:52}}>
+                    {w.photo
+                      ? <img src={w.photo} alt="" style={{width:48,height:48,borderRadius:10,objectFit:"cover",marginRight:12,flexShrink:0}}/>
+                      : <div style={{width:48,height:48,borderRadius:10,background:A.bg,marginRight:12,flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center"}}>
+                          <span style={{fontSize:18,color:A.label3}}>✦</span>
+                        </div>
+                    }
+                    <div style={{flex:1,minWidth:0}} onClick={()=>setExpandedWish(isOpen?null:w.id)}>
+                      <div style={{fontSize:17,fontFamily:SF,color:w.bought?A.label2:A.label,textDecoration:w.bought?"line-through":"none",letterSpacing:-0.41,lineHeight:"22px",cursor:"pointer"}}>{w.name}</div>
+                      <div style={{display:"flex",alignItems:"center",gap:8,marginTop:2}}>
+                        {w.price && <span style={{fontSize:13,fontFamily:SF,color:A.label2}}>{w.price} ₽</span>}
+                        {w.bought && <span style={{fontSize:11,fontFamily:SF,fontWeight:600,color:A.green,background:A.green+"18",padding:"2px 7px",borderRadius:10}}>✓ Куплено</span>}
+                      </div>
+                    </div>
+                    <button onClick={()=>setExpandedWish(isOpen?null:w.id)} style={{background:"none",border:"none",cursor:"pointer",padding:"0 0 0 8px",color:A.label2,fontSize:18,lineHeight:1,transform:isOpen?"rotate(90deg)":"none",transition:"transform .15s"}}>›</button>
+                  </div>
+                  {isOpen && (
+                    <div style={{padding:"0 16px 14px 56px",background:A.bg}}>
+                      <div style={{fontSize:12,color:A.label2,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:6}}>Название</div>
+                      <input value={w.name} onChange={e=>updateWish(w.id,"name",e.target.value)}
+                        style={{width:"100%",background:A.card,border:`1px solid ${A.sep}`,borderRadius:10,padding:"10px 12px",fontSize:15,fontFamily:SF,color:A.label,boxSizing:"border-box",outline:"none",display:"block",marginBottom:10}}/>
+                      <div style={{fontSize:12,color:A.label2,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:6}}>Фото (ссылка на изображение)</div>
+                      {w.photo && <img src={w.photo} alt="" style={{width:"100%",maxHeight:200,borderRadius:10,objectFit:"cover",marginBottom:8,display:"block"}}/>}
+                      <input value={w.photo} onChange={e=>updateWish(w.id,"photo",e.target.value)} placeholder="https://..."
+                        style={{width:"100%",background:A.card,border:`1px solid ${A.sep}`,borderRadius:10,padding:"10px 12px",fontSize:15,fontFamily:SF,color:A.blue,boxSizing:"border-box",outline:"none",display:"block",marginBottom:10}}/>
+                      <div style={{fontSize:12,color:A.label2,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:6}}>Сумма, ₽</div>
+                      <input type="number" value={w.price} onChange={e=>updateWish(w.id,"price",e.target.value)} placeholder="0"
+                        style={{width:"100%",background:A.card,border:`1px solid ${A.sep}`,borderRadius:10,padding:"10px 12px",fontSize:15,fontFamily:SF,color:A.label,boxSizing:"border-box",outline:"none",display:"block",marginBottom:10}}/>
+                      <div style={{fontSize:12,color:A.label2,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:6}}>Ссылка на товар</div>
+                      <input value={w.link} onChange={e=>updateWish(w.id,"link",e.target.value)} placeholder="https://..."
+                        style={{width:"100%",background:A.card,border:`1px solid ${A.sep}`,borderRadius:10,padding:"10px 12px",fontSize:15,fontFamily:SF,color:A.blue,boxSizing:"border-box",outline:"none",display:"block",marginBottom:w.link?4:10}}/>
+                      {w.link && <a href={w.link.startsWith("http")?w.link:`https://${w.link}`} target="_blank" rel="noreferrer" style={{display:"inline-block",marginBottom:10,fontSize:13,fontFamily:SF,color:A.blue}}>Открыть ↗</a>}
+                      <div style={{fontSize:12,color:A.label2,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:6}}>Планирую купить</div>
+                      <input type="date" value={w.plannedDate} onChange={e=>updateWish(w.id,"plannedDate",e.target.value)}
+                        style={{width:"100%",background:A.card,border:`1px solid ${A.sep}`,borderRadius:10,padding:"10px 12px",fontSize:15,fontFamily:SF,color:A.label,boxSizing:"border-box",outline:"none",display:"block",marginBottom:14}}/>
+                      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14}}>
+                        <span style={{fontSize:17,fontFamily:SF,color:A.label,letterSpacing:-0.41}}>Куплено</span>
+                        <IOSToggle value={!!w.bought} onChange={v=>updateWish(w.id,"bought",v)}/>
+                      </div>
+                      <button onClick={()=>delWish(w.id)} style={{color:A.red,background:"none",border:"none",cursor:"pointer",fontSize:15,fontFamily:SF,padding:0}}>Удалить</button>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </Card>
+        )}
+      </div>
+    </div>
+  );
 }
 
 export default function App() {
@@ -787,8 +822,9 @@ export default function App() {
     {id:"today",    icon:"◉", label:"Сегодня"},
     {id:"calendar", icon:"▦", label:"Календарь"},
     {id:"report",   icon:"▤", label:"Отчёт"},
-    {id:"settings", icon:"⚙", label:"Настройки"},
     {id:"finance",  icon:"◈", label:"Финансы"},
+    {id:"wishlist", icon:"♡", label:"Вишлист"},
+    {id:"settings", icon:"⚙", label:"Настройки"},
   ];
 
   return (
@@ -810,6 +846,7 @@ export default function App() {
           {tab==="report"   && <ReportTab   allDaily={allDaily} cycleData={cycleData}/>}
           {tab==="settings" && <SettingsTab cycleData={cycleData} saveCycle={saveCycle} allDaily={allDaily} streak={streak}/>}
           {tab==="finance"  && <FinanceTab/>}
+          {tab==="wishlist" && <WishlistTab/>}
         </div>
         <div style={{position:"fixed",bottom:0,left:"50%",transform:"translateX(-50%)",width:"100%",maxWidth:430,background:A.tabBar,borderTop:`1px solid ${A.tabBarBorder}`,display:"flex",paddingBottom:"env(safe-area-inset-bottom,8px)",backdropFilter:"blur(20px)"}}>
           {tabs.map(t=>(
