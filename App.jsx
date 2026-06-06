@@ -590,6 +590,7 @@ function FinanceTab() {
 
   const [fixedExpenses, setFixedExpenses] = useState(() => store.get("fixed-expenses") || []);
   const [monthData, setMonthData] = useState(() => store.get(monthKey) || {income:"", expenses:[]});
+  const [fixedOpen, setFixedOpen] = useState(false);
 
   useEffect(() => {
     setMonthData(store.get(monthKey) || {income:"", expenses:[]});
@@ -655,8 +656,11 @@ function FinanceTab() {
       </div>
 
       <div style={{padding:"20px 16px 0"}}>
-        <SectionHeader>Постоянные расходы (каждый месяц)</SectionHeader>
-        <Card>
+        <div style={{display:"flex",alignItems:"center",padding:"0 4px 6px 20px",cursor:"pointer"}} onClick={()=>setFixedOpen(o=>!o)}>
+          <span style={{flex:1,fontSize:13,fontWeight:400,color:A.label2,letterSpacing:-0.08,textTransform:"uppercase"}}>Постоянные расходы · {fmtMoney(fixedTotal)} ₽</span>
+          <span style={{fontSize:18,color:A.label2,transform:fixedOpen?"rotate(90deg)":"none",transition:"transform .15s",marginRight:4}}>›</span>
+        </div>
+        {fixedOpen && <Card>
           {fixedExpenses.length === 0 && <div style={{padding:"14px 16px",color:A.label2,fontSize:15,fontFamily:SF,textAlign:"center"}}>Нет постоянных расходов</div>}
           {fixedExpenses.map((e,i)=>(
             <div key={e.id} style={{...rowStyle,borderBottom:i<fixedExpenses.length-1?`1px solid ${A.sep}`:"none"}}>
@@ -666,7 +670,7 @@ function FinanceTab() {
             </div>
           ))}
           <AddRow onAdd={addFixed} placeholderName="Аренда, свет, байк..." placeholderAmt="Сумма ₽" hasBorder={fixedExpenses.length>0}/>
-        </Card>
+        </Card>}
       </div>
 
       <div style={{padding:"20px 16px 0"}}>
