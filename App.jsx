@@ -801,6 +801,17 @@ function WishlistTab() {
   };
   const delWish = id => { saveWish(wishlist.filter(w=>w.id!==id)); setExpandedWish(null); };
   const updateWish = (id, field, val) => saveWish(wishlist.map(w=>w.id===id?{...w,[field]:val}:w));
+  const pickPhoto = id => {
+    const input = document.createElement("input");
+    input.type = "file"; input.accept = "image/*";
+    input.onchange = e => {
+      const file = e.target.files[0]; if (!file) return;
+      const reader = new FileReader();
+      reader.onload = ev => updateWish(id, "photo", ev.target.result);
+      reader.readAsDataURL(file);
+    };
+    input.click();
+  };
 
   return (
     <div style={{paddingBottom:100}}>
@@ -850,10 +861,14 @@ function WishlistTab() {
                       <div style={{fontSize:12,color:A.label2,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:6}}>Название</div>
                       <input value={w.name} onChange={e=>updateWish(w.id,"name",e.target.value)}
                         style={{width:"100%",background:A.card,border:`1px solid ${A.sep}`,borderRadius:10,padding:"10px 12px",fontSize:15,fontFamily:SF,color:A.label,boxSizing:"border-box",outline:"none",display:"block",marginBottom:10}}/>
-                      <div style={{fontSize:12,color:A.label2,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:6}}>Фото (ссылка на изображение)</div>
+                      <div style={{fontSize:12,color:A.label2,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:6}}>Фото</div>
                       {w.photo && <img src={w.photo} alt="" style={{width:"100%",maxHeight:200,borderRadius:10,objectFit:"cover",marginBottom:8,display:"block"}}/>}
-                      <input value={w.photo} onChange={e=>updateWish(w.id,"photo",e.target.value)} placeholder="https://..."
-                        style={{width:"100%",background:A.card,border:`1px solid ${A.sep}`,borderRadius:10,padding:"10px 12px",fontSize:15,fontFamily:SF,color:A.blue,boxSizing:"border-box",outline:"none",display:"block",marginBottom:10}}/>
+                      <div style={{display:"flex",gap:8,marginBottom:10}}>
+                        <button onClick={()=>pickPhoto(w.id)} style={{flex:1,padding:"10px",borderRadius:10,border:`1px solid ${A.blue}`,background:A.blue+"11",color:A.blue,fontSize:15,fontFamily:SF,fontWeight:500,cursor:"pointer"}}>
+                          📷 Загрузить с устройства
+                        </button>
+                        {w.photo && <button onClick={()=>updateWish(w.id,"photo","")} style={{padding:"10px 12px",borderRadius:10,border:`1px solid ${A.sep}`,background:A.card,color:A.red,fontSize:13,fontFamily:SF,cursor:"pointer"}}>Удалить фото</button>}
+                      </div>
                       <div style={{fontSize:12,color:A.label2,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:6}}>Сумма, ₽</div>
                       <input type="number" value={w.price} onChange={e=>updateWish(w.id,"price",e.target.value)} placeholder="0"
                         style={{width:"100%",background:A.card,border:`1px solid ${A.sep}`,borderRadius:10,padding:"10px 12px",fontSize:15,fontFamily:SF,color:A.label,boxSizing:"border-box",outline:"none",display:"block",marginBottom:10}}/>
