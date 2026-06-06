@@ -497,6 +497,41 @@ function SettingsTab({cycleData, saveCycle, allDaily, streak}) {
         </Card>
       </div>
       <div style={{padding:"20px 16px 0"}}>
+        <SectionHeader>Данные</SectionHeader>
+        <Card>
+          <div style={{padding:"12px 16px",borderBottom:`1px solid ${A.sep}`,display:"flex",alignItems:"center",cursor:"pointer"}} onClick={()=>{
+            const keys=["all-daily","cycle-data","fixed-expenses","wishlist"];
+            const data={};
+            keys.forEach(k=>{const v=store.get(k);if(v)data[k]=v;});
+            Object.keys(localStorage).filter(k=>k.startsWith("finances-")).forEach(k=>{try{data[k]=JSON.parse(localStorage.getItem(k));}catch{}});
+            const blob=new Blob([JSON.stringify(data,null,2)],{type:"application/json"});
+            const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="calendar-backup.json";a.click();
+          }}>
+            <span style={{flex:1,fontSize:17,fontFamily:SF,color:A.blue,letterSpacing:-0.41}}>Экспортировать данные</span>
+            <span style={{fontSize:13,fontFamily:SF,color:A.label2}}>↓ JSON</span>
+          </div>
+          <div style={{padding:"12px 16px",display:"flex",alignItems:"center",cursor:"pointer"}} onClick={()=>{
+            const input=document.createElement("input");input.type="file";input.accept=".json";
+            input.onchange=e=>{
+              const file=e.target.files[0];if(!file)return;
+              const reader=new FileReader();
+              reader.onload=ev=>{
+                try{
+                  const data=JSON.parse(ev.target.result);
+                  Object.entries(data).forEach(([k,v])=>localStorage.setItem(k,JSON.stringify(v)));
+                  window.location.reload();
+                }catch{alert("Ошибка: неверный формат файла");}
+              };
+              reader.readAsText(file);
+            };
+            input.click();
+          }}>
+            <span style={{flex:1,fontSize:17,fontFamily:SF,color:A.blue,letterSpacing:-0.41}}>Импортировать данные</span>
+            <span style={{fontSize:13,fontFamily:SF,color:A.label2}}>↑ JSON</span>
+          </div>
+        </Card>
+      </div>
+      <div style={{padding:"20px 16px 0"}}>
         <SectionHeader>Цикл</SectionHeader>
         <Card>
           <div style={{padding:"12px 16px",borderBottom:`1px solid ${A.sep}`,display:"flex",alignItems:"center"}}>
