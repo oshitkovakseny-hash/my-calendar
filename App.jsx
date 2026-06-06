@@ -8,7 +8,6 @@ const A = {
 };
 const SF = `-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Helvetica Neue', Arial, sans-serif`;
 
-// ── localStorage (replaces window.storage) ────────────────────────────────────
 const store = {
   get(key) {
     try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : null; }
@@ -59,10 +58,19 @@ function computeStreak(allD, todayStr) {
 
 const emptyDay = () => ({ todos:[], notes:"", eating:null, sport:{done:null,type:""} });
 
-// ── Primitives ────────────────────────────────────────────────────────────────
 const LargeTitle = ({children,style={}}) => <div style={{fontSize:34,fontWeight:700,letterSpacing:0.37,lineHeight:"41px",fontFamily:SF,color:A.label,...style}}>{children}</div>;
 const SectionHeader = ({children,style={}}) => <div style={{fontSize:13,fontWeight:400,color:A.label2,letterSpacing:-0.08,fontFamily:SF,padding:"0 16px 6px 20px",textTransform:"uppercase",...style}}>{children}</div>;
 const Card = ({children,style={}}) => <div style={{background:A.card,borderRadius:12,overflow:"hidden",...style}}>{children}</div>;
+
+function TagPill({tag, size=11}) {
+  if (!tag) return null;
+  const isWork = tag === "work";
+  return (
+    <span style={{display:"inline-block",fontSize:size,fontFamily:SF,fontWeight:500,padding:"2px 7px",borderRadius:10,background:isWork?"#007AFF22":"#AF52DE22",color:isWork?A.blue:A.purple,letterSpacing:0.1,lineHeight:"16px"}}>
+      {isWork?"Работа":"Личное"}
+    </span>
+  );
+}
 
 function IOSToggle({value,onChange}) {
   return <div onClick={()=>onChange(!value)} style={{width:51,height:31,borderRadius:16,background:value?A.green:"rgba(120,120,128,0.32)",position:"relative",cursor:"pointer",transition:"background .2s",flexShrink:0}}>
@@ -78,58 +86,62 @@ function SegmentedControl({options,value,onChange}) {
   </div>;
 }
 
-// ── Task List with inline expansion ──────────────────────────────────────────
 function TaskList({dayData, onSave}) {
   const [newTodo, setNewTodo] = useState("");
-  const [cat, setCat] = useState("work");
+  const [newTag, setNewTag] = useState(null);
   const [expandedId, setExpandedId] = useState(null);
 
   const todos = dayData.todos || [];
+  const cycleTag = t => t === null ? "work" : t === "work" ? "personal" : null;
+
   const add = () => {
     if (!newTodo.trim()) return;
-    const created = {id:Date.now(), text:newTodo.trim(), done:false, cat, note:"", link:""};
+    const created = {id:Date.now(), text:newTodo.trim(), done:false, tag:newTag, note:"", link:""};
     onSave({...dayData, todos:[...todos, created]});
-    setNewTodo(""); setExpandedId(created.id);
+    setNewTodo(""); setNewTag(null); setExpandedId(created.id);
   };
   const toggle = id => onSave({...dayData, todos:todos.map(t=>t.id===id?{...t,done:!t.done}:t)});
   const del = id => { onSave({...dayData, todos:todos.filter(t=>t.id!==id)}); setExpandedId(null); };
   const updateField = (id, field, val) => onSave({...dayData, todos:todos.map(t=>t.id===id?{...t,[field]:val}:t)});
 
-  const list = todos.filter(t => t.cat === cat);
-  const accent = cat === "work" ? A.blue : A.purple;
-  const doneCount = list.filter(t => t.done).length;
+  const doneCount = todos.filter(t => t.done).length;
 
   return (
     <>
-      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",paddingRight:4,marginBottom:6}}>
+      <div style={{display:"flex",alignItems:"center",paddingRight:4,marginBottom:6}}>
         <SectionHeader style={{padding:"0 0 0 4px"}}>
-          Задачи{list.length > 0 ? ` · ${doneCount}/${list.length}` : ""}
+          Задачи{todos.length > 0 ? ` · ${doneCount}/${todos.length}` : ""}
         </SectionHeader>
-        <div style={{width:180}}><SegmentedControl options={[["work","Работа"],["personal","Личное"]]} value={cat} onChange={v=>{setCat(v);setExpandedId(null);}}/></div>
       </div>
       <Card>
         <div style={{display:"flex",alignItems:"center",padding:"0 16px",borderBottom:`1px solid ${A.sep}`,minHeight:46}}>
           <div style={{width:22,height:22,borderRadius:"50%",border:`2px solid ${A.label3}`,marginRight:12,flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center"}}>
-            <span style={{color:accent,fontSize:16,fontWeight:600,lineHeight:1}}>+</span>
+            <span style={{color:A.blue,fontSize:16,fontWeight:600,lineHeight:1}}>+</span>
           </div>
           <input value={newTodo} onChange={e=>setNewTodo(e.target.value)} onKeyDown={e=>e.key==="Enter"&&add()}
-            placeholder={cat==="work"?"Новая рабочая задача...":"Новая личная задача..."}
+            placeholder="Новая задача..."
             style={{flex:1,border:"none",background:"transparent",fontSize:17,fontFamily:SF,color:A.label,padding:"11px 0",outline:"none",letterSpacing:-0.41}}/>
-          {newTodo.trim() && <button onClick={add} style={{color:accent,background:"none",border:"none",cursor:"pointer",fontSize:15,fontWeight:600,fontFamily:SF,padding:"0 0 0 8px"}}>Добавить</button>}
+          <button onClick={()=>setNewTag(cycleTag(newTag))} style={{background:"none",border:"none",cursor:"pointer",padding:"0 6px 0 4px",flexShrink:0}}>
+            {newTag ? <TagPill tag={newTag} size={12}/> : <span style={{fontSize:12,fontFamily:SF,color:A.label3,padding:"2px 7px",borderRadius:10,border:`1px dashed ${A.label3}`}}>тег</span>}
+          </button>
+          {newTodo.trim() && <button onClick={add} style={{color:A.blue,background:"none",border:"none",cursor:"pointer",fontSize:15,fontWeight:600,fontFamily:SF,padding:"0 0 0 4px"}}>Добавить</button>}
         </div>
 
-        {list.length === 0 && <div style={{padding:"14px 16px",textAlign:"center",color:A.label2,fontSize:15,fontFamily:SF}}>{cat==="work"?"Рабочих задач нет":"Личных задач нет"}</div>}
+        {todos.length === 0 && <div style={{padding:"14px 16px",textAlign:"center",color:A.label2,fontSize:15,fontFamily:SF}}>Задач нет</div>}
 
-        {list.map((t, i) => {
+        {todos.map((t, i) => {
           const isOpen = expandedId === t.id;
           return (
-            <div key={t.id} style={{borderBottom: i<list.length-1||isOpen ? `1px solid ${A.sep}` : "none"}}>
+            <div key={t.id} style={{borderBottom: i<todos.length-1||isOpen ? `1px solid ${A.sep}` : "none"}}>
               <div style={{display:"flex",alignItems:"flex-start",padding:"11px 16px",minHeight:46}}>
-                <button onClick={()=>toggle(t.id)} style={{width:22,height:22,borderRadius:"50%",border:`2px solid ${t.done?accent:A.label3}`,background:t.done?accent:"transparent",cursor:"pointer",marginRight:12,marginTop:2,flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center"}}>
+                <button onClick={()=>toggle(t.id)} style={{width:22,height:22,borderRadius:"50%",border:`2px solid ${t.done?A.blue:A.label3}`,background:t.done?A.blue:"transparent",cursor:"pointer",marginRight:12,marginTop:2,flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center"}}>
                   {t.done && <span style={{color:"#fff",fontSize:11,fontWeight:700}}>✓</span>}
                 </button>
                 <div onClick={()=>setExpandedId(isOpen?null:t.id)} style={{flex:1,cursor:"pointer",minWidth:0}}>
-                  <div style={{fontSize:17,fontFamily:SF,color:t.done?A.label2:A.label,textDecoration:t.done?"line-through":"none",letterSpacing:-0.41,lineHeight:"22px"}}>{t.text}</div>
+                  <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
+                    <span style={{fontSize:17,fontFamily:SF,color:t.done?A.label2:A.label,textDecoration:t.done?"line-through":"none",letterSpacing:-0.41,lineHeight:"22px"}}>{t.text}</span>
+                    {t.tag && <TagPill tag={t.tag}/>}
+                  </div>
                   {!isOpen && t.note && <div style={{fontSize:13,fontFamily:SF,color:A.label2,marginTop:2,lineHeight:"17px"}}>{t.note}</div>}
                   {!isOpen && t.link && <div style={{fontSize:13,fontFamily:SF,color:A.blue,marginTop:2}}>🔗 {t.link}</div>}
                 </div>
@@ -137,6 +149,16 @@ function TaskList({dayData, onSave}) {
               </div>
               {isOpen && (
                 <div style={{padding:"0 16px 14px 50px",background:A.bg}}>
+                  <div style={{marginBottom:10}}>
+                    <div style={{fontSize:12,color:A.label2,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:6}}>Тег</div>
+                    <div style={{display:"flex",gap:6}}>
+                      {[null,"work","personal"].map(v=>(
+                        <button key={String(v)} onClick={()=>updateField(t.id,"tag",v)} style={{padding:"4px 12px",borderRadius:10,border:`1.5px solid ${t.tag===v?(v==="work"?A.blue:v==="personal"?A.purple:A.label3):A.sep}`,background:t.tag===v?(v==="work"?"#007AFF22":v==="personal"?"#AF52DE22":A.card):A.card,cursor:"pointer",fontSize:12,fontFamily:SF,color:t.tag===v?(v==="work"?A.blue:v==="personal"?A.purple:A.label):A.label2,fontWeight:t.tag===v?600:400}}>
+                          {v===null?"Без тега":v==="work"?"Работа":"Личное"}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                   <div style={{fontSize:12,color:A.label2,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:6}}>Заметка</div>
                   <textarea value={t.note||""} onChange={e=>updateField(t.id,"note",e.target.value)} placeholder="Подробности, контекст, ссылки..." rows={3}
                     style={{width:"100%",background:A.card,border:`1px solid ${A.sep}`,borderRadius:10,padding:"10px 12px",fontSize:15,fontFamily:SF,color:A.label,resize:"none",boxSizing:"border-box",lineHeight:"20px",outline:"none",display:"block"}}/>
@@ -218,7 +240,6 @@ function EatingCard({dayData, onSave, allDaily, streak}) {
   );
 }
 
-// ── Today Tab ─────────────────────────────────────────────────────────────────
 function TodayTab({dayData, onSave, allDaily, streak, cycleData}) {
   const now = new Date(), phase = getCyclePhase(now, cycleData);
   return (
@@ -247,7 +268,6 @@ function TodayTab({dayData, onSave, allDaily, streak, cycleData}) {
   );
 }
 
-// ── Calendar Tab ──────────────────────────────────────────────────────────────
 function CalendarTab({allDaily, cycleData, saveDayData}) {
   const [calMonth, setCalMonth] = useState(new Date());
   const [selectedDay, setSelectedDay] = useState(new Date());
@@ -314,7 +334,6 @@ function CalendarTab({allDaily, cycleData, saveDayData}) {
   );
 }
 
-// ── Report Tab ────────────────────────────────────────────────────────────────
 function ReportTab({allDaily, cycleData}) {
   const today = new Date(), ago = new Date();
   ago.setDate(ago.getDate()-29);
@@ -401,8 +420,9 @@ function ReportTab({allDaily, cycleData}) {
 function buildReportHTML(daysInRange, allDaily, cycleData, from, to, fmt, goodN, sportN, taskN) {
   const rows = daysInRange.map(k => {
     const v = allDaily[k], phase = getCyclePhase(parseKey(k), cycleData);
-    const work = (v.todos||[]).filter(x=>x.cat==="work");
-    const pers = (v.todos||[]).filter(x=>x.cat!=="work");
+    const work = (v.todos||[]).filter(x=>x.tag==="work");
+    const pers = (v.todos||[]).filter(x=>x.tag==="personal");
+    const untagged = (v.todos||[]).filter(x=>!x.tag);
     return `
       <div style="margin-bottom:18px;page-break-inside:avoid;">
         <div style="display:flex;justify-content:space-between;align-items:baseline;border-bottom:1px solid #000;padding-bottom:4px;margin-bottom:8px;">
@@ -416,6 +436,7 @@ function buildReportHTML(daysInRange, allDaily, cycleData, from, to, fmt, goodN,
         </div>
         ${work.length?`<div style="margin-bottom:4px;"><div style="font-size:11px;color:#888;text-transform:uppercase;margin-bottom:2px;">Работа</div>${work.map(x=>`<div style="font-size:14px;margin-left:8px;">${x.done?"☑":"☐"} ${x.text}${x.note?` — <i>${x.note}</i>`:""}${x.link?` <a href="${x.link}">${x.link}</a>`:""}</div>`).join("")}</div>`:""}
         ${pers.length?`<div style="margin-bottom:4px;"><div style="font-size:11px;color:#888;text-transform:uppercase;margin-bottom:2px;">Личное</div>${pers.map(x=>`<div style="font-size:14px;margin-left:8px;">${x.done?"☑":"☐"} ${x.text}${x.note?` — <i>${x.note}</i>`:""}${x.link?` <a href="${x.link}">${x.link}</a>`:""}</div>`).join("")}</div>`:""}
+        ${untagged.length?`<div style="margin-bottom:4px;"><div style="font-size:11px;color:#888;text-transform:uppercase;margin-bottom:2px;">Другое</div>${untagged.map(x=>`<div style="font-size:14px;margin-left:8px;">${x.done?"☑":"☐"} ${x.text}${x.note?` — <i>${x.note}</i>`:""}${x.link?` <a href="${x.link}">${x.link}</a>`:""}</div>`).join("")}</div>`:""}
         ${v.notes?`<div style="font-size:13px;color:#333;margin-top:4px;font-style:italic;">Заметка: ${v.notes}</div>`:""}
       </div>`;
   }).join("");
@@ -435,7 +456,6 @@ function buildReportHTML(daysInRange, allDaily, cycleData, from, to, fmt, goodN,
     </body></html>`;
 }
 
-// ── Settings Tab ──────────────────────────────────────────────────────────────
 function SettingsTab({cycleData, saveCycle, allDaily, streak}) {
   const [localLen, setLocalLen] = useState(String(cycleData.length||28));
   const today = todayKey(), phase = getCyclePhase(new Date(), cycleData);
@@ -503,7 +523,241 @@ function SettingsTab({cycleData, saveCycle, allDaily, streak}) {
   );
 }
 
-// ── Root ──────────────────────────────────────────────────────────────────────
+function FinanceTab() {
+  const now = new Date();
+  const [month, setMonth] = useState({y:now.getFullYear(), m:now.getMonth()});
+  const monthKey = `finances-${month.y}-${pad(month.m+1)}`;
+
+  const [fixedExpenses, setFixedExpenses] = useState(() => store.get("fixed-expenses") || []);
+  const [monthData, setMonthData] = useState(() => store.get(monthKey) || {income:0, expenses:[]});
+  const [wishlist, setWishlist] = useState(() => store.get("wishlist") || []);
+
+  const [newFixedName, setNewFixedName] = useState("");
+  const [newFixedAmt, setNewFixedAmt] = useState("");
+  const [newExpName, setNewExpName] = useState("");
+  const [newExpAmt, setNewExpAmt] = useState("");
+  const [newWishName, setNewWishName] = useState("");
+  const [expandedWish, setExpandedWish] = useState(null);
+
+  useEffect(() => {
+    const d = store.get(monthKey) || {income:0, expenses:[]};
+    setMonthData(d);
+  }, [monthKey]);
+
+  const saveFixed = fe => { setFixedExpenses(fe); store.set("fixed-expenses", fe); };
+  const saveMD = md => { setMonthData(md); store.set(monthKey, md); };
+  const saveWish = wl => { setWishlist(wl); store.set("wishlist", wl); };
+
+  const prevMonth = () => setMonth(({y,m}) => m===0 ? {y:y-1,m:11} : {y,m:m-1});
+  const nextMonth = () => setMonth(({y,m}) => m===11 ? {y:y+1,m:0} : {y,m:m+1});
+
+  const addFixed = () => {
+    if (!newFixedName.trim() || !newFixedAmt) return;
+    saveFixed([...fixedExpenses, {id:Date.now(), name:newFixedName.trim(), amount:parseFloat(newFixedAmt)||0}]);
+    setNewFixedName(""); setNewFixedAmt("");
+  };
+  const delFixed = id => saveFixed(fixedExpenses.filter(e=>e.id!==id));
+
+  const addExp = () => {
+    if (!newExpName.trim() || !newExpAmt) return;
+    const exp = {id:Date.now(), name:newExpName.trim(), amount:parseFloat(newExpAmt)||0, date:toKey(new Date())};
+    saveMD({...monthData, expenses:[...(monthData.expenses||[]), exp]});
+    setNewExpName(""); setNewExpAmt("");
+  };
+  const delExp = id => saveMD({...monthData, expenses:(monthData.expenses||[]).filter(e=>e.id!==id)});
+
+  const addWish = () => {
+    if (!newWishName.trim()) return;
+    const w = {id:Date.now(), name:newWishName.trim(), price:"", link:"", note:""};
+    saveWish([w, ...wishlist]);
+    setNewWishName(""); setExpandedWish(w.id);
+  };
+  const delWish = id => { saveWish(wishlist.filter(w=>w.id!==id)); setExpandedWish(null); };
+  const updateWish = (id, field, val) => saveWish(wishlist.map(w=>w.id===id?{...w,[field]:val}:w));
+
+  const fixedTotal = fixedExpenses.reduce((a,e)=>a+e.amount, 0);
+  const varTotal = (monthData.expenses||[]).reduce((a,e)=>a+e.amount, 0);
+  const totalSpent = fixedTotal + varTotal;
+  const balance = (monthData.income||0) - totalSpent;
+
+  const fmtMoney = n => Number(n).toLocaleString("ru-RU");
+
+  const generateFinanceReport = () => {
+    const win = window.open("","_blank");
+    if (!win) return;
+    const html = buildFinanceReportHTML(month, monthData, fixedExpenses, wishlist, fmtMoney);
+    win.document.write(html);
+    win.document.close();
+    win.focus();
+    setTimeout(()=>win.print(), 400);
+  };
+
+  const rowStyle = (last) => ({display:"flex",alignItems:"center",padding:"11px 16px",borderBottom:last?"none":`1px solid ${A.sep}`,minHeight:44});
+
+  return (
+    <div style={{paddingBottom:100}}>
+      <div style={{padding:"16px 20px 8px"}}>
+        <LargeTitle>Финансы</LargeTitle>
+      </div>
+      <div style={{display:"flex",alignItems:"center",gap:8,padding:"0 16px 8px"}}>
+        <button onClick={prevMonth} style={{width:32,height:32,borderRadius:"50%",background:A.bg,border:"none",cursor:"pointer",fontSize:16,color:A.blue}}>‹</button>
+        <span style={{flex:1,textAlign:"center",fontSize:17,fontFamily:SF,fontWeight:600,color:A.label}}>{MONTHS[month.m]} {month.y}</span>
+        <button onClick={nextMonth} style={{width:32,height:32,borderRadius:"50%",background:A.bg,border:"none",cursor:"pointer",fontSize:16,color:A.blue}}>›</button>
+      </div>
+
+      <div style={{padding:"8px 16px 0"}}>
+        <SectionHeader>Доходы</SectionHeader>
+        <Card>
+          <div style={{display:"flex",alignItems:"center",padding:"11px 16px"}}>
+            <input type="number" value={monthData.income||""} placeholder="0"
+              onChange={e=>saveMD({...monthData,income:parseFloat(e.target.value)||0})}
+              style={{flex:1,border:"none",background:"transparent",fontSize:20,fontFamily:SF,fontWeight:600,color:A.label,outline:"none",letterSpacing:-0.5}}/>
+            <span style={{fontSize:15,fontFamily:SF,color:A.label2}}>₽ в месяц</span>
+          </div>
+        </Card>
+      </div>
+
+      <div style={{padding:"20px 16px 0"}}>
+        <SectionHeader>Постоянные расходы</SectionHeader>
+        <Card>
+          {fixedExpenses.map((e,i)=>(
+            <div key={e.id} style={rowStyle(i===fixedExpenses.length-1 && false)}>
+              <span style={{flex:1,fontSize:17,fontFamily:SF,color:A.label}}>{e.name}</span>
+              <span style={{fontSize:15,fontFamily:SF,color:A.label2,marginRight:12}}>{fmtMoney(e.amount)} ₽</span>
+              <button onClick={()=>delFixed(e.id)} style={{color:A.red,background:"none",border:"none",cursor:"pointer",fontSize:18,fontFamily:SF,lineHeight:1,padding:"0 0 0 4px"}}>×</button>
+            </div>
+          ))}
+          <div style={{display:"flex",alignItems:"center",padding:"10px 16px",borderTop:fixedExpenses.length?`1px solid ${A.sep}`:"none",gap:8}}>
+            <input value={newFixedName} onChange={e=>setNewFixedName(e.target.value)} placeholder="Название" onKeyDown={e=>e.key==="Enter"&&addFixed()}
+              style={{flex:2,border:"none",background:A.bg,borderRadius:8,padding:"7px 10px",fontSize:15,fontFamily:SF,color:A.label,outline:"none"}}/>
+            <input type="number" value={newFixedAmt} onChange={e=>setNewFixedAmt(e.target.value)} placeholder="0 ₽" onKeyDown={e=>e.key==="Enter"&&addFixed()}
+              style={{flex:1,border:"none",background:A.bg,borderRadius:8,padding:"7px 10px",fontSize:15,fontFamily:SF,color:A.label,outline:"none"}}/>
+            <button onClick={addFixed} style={{color:A.blue,background:"none",border:"none",cursor:"pointer",fontSize:14,fontFamily:SF,fontWeight:600,whiteSpace:"nowrap"}}>Добавить</button>
+          </div>
+        </Card>
+      </div>
+
+      <div style={{padding:"20px 16px 0"}}>
+        <SectionHeader>Расходы · {MONTHS_G[month.m]}</SectionHeader>
+        <Card>
+          {(monthData.expenses||[]).map((e,i)=>(
+            <div key={e.id} style={rowStyle(false)}>
+              <span style={{flex:1,fontSize:17,fontFamily:SF,color:A.label}}>{e.name}</span>
+              <span style={{fontSize:15,fontFamily:SF,color:A.label2,marginRight:12}}>{fmtMoney(e.amount)} ₽</span>
+              <button onClick={()=>delExp(e.id)} style={{color:A.red,background:"none",border:"none",cursor:"pointer",fontSize:18,fontFamily:SF,lineHeight:1,padding:"0 0 0 4px"}}>×</button>
+            </div>
+          ))}
+          <div style={{display:"flex",alignItems:"center",padding:"10px 16px",borderTop:(monthData.expenses||[]).length?`1px solid ${A.sep}`:"none",gap:8}}>
+            <input value={newExpName} onChange={e=>setNewExpName(e.target.value)} placeholder="Название" onKeyDown={e=>e.key==="Enter"&&addExp()}
+              style={{flex:2,border:"none",background:A.bg,borderRadius:8,padding:"7px 10px",fontSize:15,fontFamily:SF,color:A.label,outline:"none"}}/>
+            <input type="number" value={newExpAmt} onChange={e=>setNewExpAmt(e.target.value)} placeholder="0 ₽" onKeyDown={e=>e.key==="Enter"&&addExp()}
+              style={{flex:1,border:"none",background:A.bg,borderRadius:8,padding:"7px 10px",fontSize:15,fontFamily:SF,color:A.label,outline:"none"}}/>
+            <button onClick={addExp} style={{color:A.blue,background:"none",border:"none",cursor:"pointer",fontSize:14,fontFamily:SF,fontWeight:600,whiteSpace:"nowrap"}}>Добавить</button>
+          </div>
+        </Card>
+      </div>
+
+      <div style={{padding:"20px 16px 0"}}>
+        <SectionHeader>Итого</SectionHeader>
+        <Card>
+          {[
+            ["Доходы", fmtMoney(monthData.income||0)+" ₽", A.green],
+            ["Постоянные расходы", fmtMoney(fixedTotal)+" ₽", A.label],
+            ["Переменные расходы", fmtMoney(varTotal)+" ₽", A.label],
+            ["Всего потрачено", fmtMoney(totalSpent)+" ₽", A.red],
+            ["Остаток", fmtMoney(balance)+" ₽", balance>=0?A.green:A.red],
+          ].map(([label,val,color],i,arr)=>(
+            <div key={label} style={{display:"flex",alignItems:"center",padding:"11px 16px",borderBottom:i<arr.length-1?`1px solid ${A.sep}`:"none"}}>
+              <span style={{flex:1,fontSize:label==="Остаток"?17:15,fontFamily:SF,fontWeight:label==="Остаток"?600:400,color:A.label}}>{label}</span>
+              <span style={{fontSize:label==="Остаток"?17:15,fontFamily:SF,fontWeight:label==="Остаток"?700:400,color}}>{val}</span>
+            </div>
+          ))}
+        </Card>
+      </div>
+
+      <div style={{padding:"20px 16px 0"}}>
+        <SectionHeader>Вишлист</SectionHeader>
+        <Card>
+          <div style={{display:"flex",alignItems:"center",padding:"10px 16px",borderBottom:`1px solid ${A.sep}`,gap:8}}>
+            <input value={newWishName} onChange={e=>setNewWishName(e.target.value)} placeholder="Новый пункт..." onKeyDown={e=>e.key==="Enter"&&addWish()}
+              style={{flex:1,border:"none",background:A.bg,borderRadius:8,padding:"7px 10px",fontSize:15,fontFamily:SF,color:A.label,outline:"none"}}/>
+            <button onClick={addWish} style={{color:A.blue,background:"none",border:"none",cursor:"pointer",fontSize:14,fontFamily:SF,fontWeight:600}}>Добавить</button>
+          </div>
+          {wishlist.length===0 && <div style={{padding:"14px 16px",textAlign:"center",color:A.label2,fontSize:15,fontFamily:SF}}>Список пуст</div>}
+          {wishlist.map((w,i)=>{
+            const isOpen = expandedWish === w.id;
+            return (
+              <div key={w.id} style={{borderBottom:i<wishlist.length-1||isOpen?`1px solid ${A.sep}`:"none"}}>
+                <div style={{display:"flex",alignItems:"center",padding:"11px 16px",cursor:"pointer"}} onClick={()=>setExpandedWish(isOpen?null:w.id)}>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{fontSize:17,fontFamily:SF,color:A.label,letterSpacing:-0.41}}>{w.name}</div>
+                    {w.price && <div style={{fontSize:13,fontFamily:SF,color:A.label2,marginTop:1}}>{fmtMoney(w.price)} ₽</div>}
+                  </div>
+                  {w.link && <span style={{fontSize:14,color:A.blue,marginRight:8}}>🔗</span>}
+                  <button onClick={e=>{e.stopPropagation();setExpandedWish(isOpen?null:w.id);}} style={{background:"none",border:"none",cursor:"pointer",color:A.label2,fontSize:18,lineHeight:1,transform:isOpen?"rotate(90deg)":"none",transition:"transform .15s"}}>›</button>
+                </div>
+                {isOpen && (
+                  <div style={{padding:"0 16px 14px",background:A.bg}}>
+                    <div style={{fontSize:12,color:A.label2,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:6}}>Название</div>
+                    <input value={w.name} onChange={e=>updateWish(w.id,"name",e.target.value)}
+                      style={{width:"100%",background:A.card,border:`1px solid ${A.sep}`,borderRadius:10,padding:"10px 12px",fontSize:15,fontFamily:SF,color:A.label,boxSizing:"border-box",outline:"none",display:"block",marginBottom:10}}/>
+                    <div style={{fontSize:12,color:A.label2,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:6}}>Цена</div>
+                    <input type="number" value={w.price} onChange={e=>updateWish(w.id,"price",e.target.value)} placeholder="0"
+                      style={{width:"100%",background:A.card,border:`1px solid ${A.sep}`,borderRadius:10,padding:"10px 12px",fontSize:15,fontFamily:SF,color:A.label,boxSizing:"border-box",outline:"none",display:"block",marginBottom:10}}/>
+                    <div style={{fontSize:12,color:A.label2,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:6}}>Ссылка</div>
+                    <input value={w.link} onChange={e=>updateWish(w.id,"link",e.target.value)} placeholder="https://..."
+                      style={{width:"100%",background:A.card,border:`1px solid ${A.sep}`,borderRadius:10,padding:"10px 12px",fontSize:15,fontFamily:SF,color:A.blue,boxSizing:"border-box",outline:"none",display:"block",marginBottom:10}}/>
+                    <div style={{fontSize:12,color:A.label2,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:6}}>Заметка</div>
+                    <textarea value={w.note} onChange={e=>updateWish(w.id,"note",e.target.value)} placeholder="Описание, где купить..." rows={2}
+                      style={{width:"100%",background:A.card,border:`1px solid ${A.sep}`,borderRadius:10,padding:"10px 12px",fontSize:15,fontFamily:SF,color:A.label,resize:"none",boxSizing:"border-box",lineHeight:"20px",outline:"none",display:"block",marginBottom:12}}/>
+                    <button onClick={()=>delWish(w.id)} style={{color:A.red,background:"none",border:"none",cursor:"pointer",fontSize:15,fontFamily:SF,padding:0}}>Удалить</button>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </Card>
+      </div>
+
+      <div style={{padding:"24px 16px 0"}}>
+        <button onClick={generateFinanceReport} style={{width:"100%",padding:"15px",borderRadius:14,border:"none",background:A.blue,color:"#fff",fontSize:17,fontWeight:600,fontFamily:SF,cursor:"pointer"}}>
+          Создать отчёт
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function buildFinanceReportHTML(month, monthData, fixedExpenses, wishlist, fmtMoney) {
+  const title = `Финансы · ${MONTHS[month.m]} ${month.y}`;
+  const fixedTotal = fixedExpenses.reduce((a,e)=>a+e.amount,0);
+  const varTotal = (monthData.expenses||[]).reduce((a,e)=>a+e.amount,0);
+  const totalSpent = fixedTotal + varTotal;
+  const balance = (monthData.income||0) - totalSpent;
+  const balColor = balance >= 0 ? "#34C759" : "#FF3B30";
+
+  const fixedRows = fixedExpenses.map(e=>`<tr><td>${e.name}</td><td style="text-align:right;">${fmtMoney(e.amount)} ₽</td></tr>`).join("") || `<tr><td colspan="2" style="color:#888;">Нет данных</td></tr>`;
+  const varRows = (monthData.expenses||[]).map(e=>`<tr><td>${e.name}</td><td style="text-align:right;">${fmtMoney(e.amount)} ₽</td><td style="color:#888;font-size:12px;">${e.date||""}</td></tr>`).join("") || `<tr><td colspan="3" style="color:#888;">Нет данных</td></tr>`;
+  const wishRows = wishlist.length ? wishlist.map(w=>`<li>${w.name}${w.price?` — ${fmtMoney(w.price)} ₽`:""}${w.link?` <a href="${w.link}">${w.link}</a>`:""}</li>`).join("") : "<li>Пусто</li>";
+
+  return `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${title}</title>
+    <style>body{font-family:-apple-system,Helvetica,sans-serif;padding:24px;color:#000;}table{width:100%;border-collapse:collapse;margin-bottom:16px;}th{text-align:left;font-size:12px;color:#888;text-transform:uppercase;padding:4px 0;border-bottom:1px solid #ccc;}td{padding:6px 0;border-bottom:1px solid #eee;font-size:14px;}@page{margin:1.4cm;}</style>
+    </head><body>
+    <h1 style="font-size:22px;margin:0 0 16px;">${title}</h1>
+    <div style="margin-bottom:16px;font-size:16px;">Доходы: <b style="color:#34C759;">${fmtMoney(monthData.income||0)} ₽</b></div>
+    <h2 style="font-size:16px;margin:0 0 8px;">Постоянные расходы</h2>
+    <table><thead><tr><th>Название</th><th style="text-align:right;">Сумма</th></tr></thead><tbody>${fixedRows}</tbody>
+    <tfoot><tr><td><b>Итого</b></td><td style="text-align:right;"><b>${fmtMoney(fixedTotal)} ₽</b></td></tr></tfoot></table>
+    <h2 style="font-size:16px;margin:0 0 8px;">Переменные расходы</h2>
+    <table><thead><tr><th>Название</th><th style="text-align:right;">Сумма</th><th>Дата</th></tr></thead><tbody>${varRows}</tbody>
+    <tfoot><tr><td><b>Итого</b></td><td style="text-align:right;"><b>${fmtMoney(varTotal)} ₽</b></td><td></td></tr></tfoot></table>
+    <div style="font-size:16px;margin-bottom:6px;">Всего потрачено: <b>${fmtMoney(totalSpent)} ₽</b></div>
+    <div style="font-size:18px;margin-bottom:20px;">Остаток: <b style="color:${balColor};">${fmtMoney(balance)} ₽</b></div>
+    <h2 style="font-size:16px;margin:0 0 8px;">Вишлист</h2>
+    <ul style="font-size:14px;padding-left:20px;">${wishRows}</ul>
+    </body></html>`;
+}
+
 export default function App() {
   const [tab, setTab] = useState("today");
   const [allDaily, setAllDaily] = useState({});
@@ -534,6 +788,7 @@ export default function App() {
     {id:"calendar", icon:"▦", label:"Календарь"},
     {id:"report",   icon:"▤", label:"Отчёт"},
     {id:"settings", icon:"⚙", label:"Настройки"},
+    {id:"finance",  icon:"◈", label:"Финансы"},
   ];
 
   return (
@@ -554,6 +809,7 @@ export default function App() {
           {tab==="calendar" && <CalendarTab allDaily={allDaily} cycleData={cycleData} saveDayData={saveDayData}/>}
           {tab==="report"   && <ReportTab   allDaily={allDaily} cycleData={cycleData}/>}
           {tab==="settings" && <SettingsTab cycleData={cycleData} saveCycle={saveCycle} allDaily={allDaily} streak={streak}/>}
+          {tab==="finance"  && <FinanceTab/>}
         </div>
         <div style={{position:"fixed",bottom:0,left:"50%",transform:"translateX(-50%)",width:"100%",maxWidth:430,background:A.tabBar,borderTop:`1px solid ${A.tabBarBorder}`,display:"flex",paddingBottom:"env(safe-area-inset-bottom,8px)",backdropFilter:"blur(20px)"}}>
           {tabs.map(t=>(
