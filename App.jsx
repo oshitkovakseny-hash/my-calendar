@@ -1,4 +1,8 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
+import {
+  auth, db, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged,
+  doc, setDoc, getDoc, onSnapshot, isFirebaseConfigured
+} from "./firebase.js";
 
 const A = {
   bg:"#F2F2F7", card:"#FFFFFF", label:"#000000",
@@ -8,6 +12,19 @@ const A = {
 };
 const SF = `-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Helvetica Neue', Arial, sans-serif`;
 
+let _fbUser = null;
+let _syncDisabled = false;
+
+function fbPath(uid, key) {
+  return doc(db, "users", uid, "store", key);
+}
+
+async function fbSet(key, val) {
+  if (!_fbUser || !db || _syncDisabled) return;
+  try { await setDoc(fbPath(_fbUser.uid, key), { value: val }); }
+  catch (e) { console.warn("Firebase write error:", e); }
+}
+
 const store = {
   get(key) {
     try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : null; }
@@ -16,6 +33,7 @@ const store = {
   set(key, val) {
     try { localStorage.setItem(key, JSON.stringify(val)); }
     catch {}
+    fbSet(key, val);
   },
 };
 
@@ -896,18 +914,132 @@ function WishlistTab() {
   );
 }
 
+const SYNC_KEYS = ["all-daily", "cycle-data", "fixed-expenses", "wishlist"];
+const FIREBASE_CONFIGURED = isFirebaseConfigured();
+
+async function loadAllFromFirebase(uid) {
+  if (!db) return {};
+  const results = {};
+  await Promise.all(SYNC_KEYS.map(async key => {
+    try {
+      const snap = await getDoc(doc(db, "users", uid, "store", key));
+      if (snap.exists()) results[key] = snap.data().value;
+    } catch {}
+  }));
+  // also load finances keys from localStorage pattern
+  const finKeys = Object.keys(localStorage).filter(k => k.startsWith("finances-"));
+  await Promise.all(finKeys.map(async key => {
+    try {
+      const snap = await getDoc(doc(db, "users", uid, "store", key));
+      if (snap.exists()) results[key] = snap.data().value;
+    } catch {}
+  }));
+  return results;
+}
+
+function mergeAndApply(fbData) {
+  // Firebase data wins (it's the latest from any device)
+  Object.entries(fbData).forEach(([k, v]) => {
+    try { localStorage.setItem(k, JSON.stringify(v)); } catch {}
+  });
+}
+
 export default function App() {
   const [tab, setTab] = useState("today");
   const [allDaily, setAllDaily] = useState({});
   const [cycleData, setCycleData] = useState({startDates:[], length:28});
   const [streak, setStreak] = useState(0);
+  const [user, setUser] = useState(null);
+  const [syncStatus, setSyncStatus] = useState("idle"); // idle | syncing | synced | error
+  const [authLoading, setAuthLoading] = useState(FIREBASE_CONFIGURED);
+  const unsubSnapshotsRef = useRef([]);
   const today = todayKey();
 
-  useEffect(() => {
+  const loadLocal = useCallback(() => {
     const ad = store.get("all-daily") || {};
     const cd = store.get("cycle-data") || {startDates:[], length:28};
     setAllDaily(ad); setCycleData(cd); setStreak(computeStreak(ad, today));
+  }, [today]);
+
+  // Subscribe to Firestore real-time updates for sync
+  const subscribeFirestore = useCallback((uid) => {
+    unsubSnapshotsRef.current.forEach(u => u());
+    unsubSnapshotsRef.current = [];
+    if (!db) return;
+
+    const keysToWatch = [...SYNC_KEYS];
+    keysToWatch.forEach(key => {
+      const unsub = onSnapshot(doc(db, "users", uid, "store", key), (snap) => {
+        if (!snap.exists()) return;
+        const val = snap.data().value;
+        let localVal;
+        try { localVal = JSON.parse(localStorage.getItem(key)); } catch {}
+        if (JSON.stringify(val) === JSON.stringify(localVal)) return;
+        // Remote changed — update localStorage and React state
+        _syncDisabled = true;
+        try { localStorage.setItem(key, JSON.stringify(val)); } catch {}
+        _syncDisabled = false;
+        if (key === "all-daily") {
+          setAllDaily(val || {});
+          setStreak(computeStreak(val || {}, todayKey()));
+        } else if (key === "cycle-data") {
+          setCycleData(val || {startDates:[], length:28});
+        }
+        setSyncStatus("synced");
+      }, () => { setSyncStatus("error"); });
+      unsubSnapshotsRef.current.push(unsub);
+    });
   }, []);
+
+  useEffect(() => {
+    loadLocal();
+    if (!FIREBASE_CONFIGURED || !auth) { setAuthLoading(false); return; }
+    const unsub = onAuthStateChanged(auth, async (u) => {
+      setUser(u);
+      setAuthLoading(false);
+      if (u) {
+        _fbUser = u;
+        setSyncStatus("syncing");
+        try {
+          const fbData = await loadAllFromFirebase(u.uid);
+          if (Object.keys(fbData).length > 0) {
+            mergeAndApply(fbData);
+            loadLocal();
+          }
+          // Push local data to Firebase (in case local has newer data)
+          SYNC_KEYS.forEach(key => {
+            const local = store.get(key);
+            if (local) fbSet(key, local);
+          });
+          setSyncStatus("synced");
+          subscribeFirestore(u.uid);
+        } catch { setSyncStatus("error"); }
+      } else {
+        _fbUser = null;
+        unsubSnapshotsRef.current.forEach(u => u());
+        unsubSnapshotsRef.current = [];
+      }
+    });
+    return () => { unsub(); unsubSnapshotsRef.current.forEach(u => u()); };
+  }, [loadLocal, subscribeFirestore]);
+
+  const handleSignIn = async () => {
+    if (!auth) return;
+    try { await signInWithPopup(auth, new GoogleAuthProvider()); }
+    catch (e) { console.error(e); }
+  };
+  const handleSignOut = async () => {
+    if (!auth) return;
+    await signOut(auth);
+    setSyncStatus("idle");
+  };
+
+  useEffect(() => {
+    if (syncStatus === "synced") {
+      const t = setTimeout(() => setSyncStatus("idle"), 3000);
+      return () => clearTimeout(t);
+    }
+  }, [syncStatus]);
 
   const saveDayData = useCallback((key, data) => {
     setAllDaily(prev => {
@@ -929,6 +1061,27 @@ export default function App() {
     {id:"settings", icon:"⚙", label:"Настройки"},
   ];
 
+  const syncBar = FIREBASE_CONFIGURED ? (
+    <div style={{background:user ? "#007AFF11" : "#F2F2F7", borderBottom:`1px solid ${A.sep}`, padding:"6px 16px", display:"flex", alignItems:"center", gap:8, minHeight:36}}>
+      {authLoading ? (
+        <span style={{fontSize:12, fontFamily:SF, color:A.label2}}>Загрузка...</span>
+      ) : user ? (
+        <>
+          <div style={{width:6,height:6,borderRadius:"50%",background:syncStatus==="error"?A.red:syncStatus==="syncing"?"#FF9500":syncStatus==="synced"?A.green:A.blue,flexShrink:0}}/>
+          <span style={{flex:1,fontSize:12,fontFamily:SF,color:A.label2,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+            {syncStatus==="syncing"?"Синхронизация...":syncStatus==="synced"?"Синхронизировано ✓":syncStatus==="error"?"Ошибка синхронизации":user.displayName||user.email}
+          </span>
+          <button onClick={handleSignOut} style={{fontSize:11,fontFamily:SF,color:A.label2,background:"none",border:"none",cursor:"pointer",padding:"2px 6px",borderRadius:6,flexShrink:0}}>Выйти</button>
+        </>
+      ) : (
+        <>
+          <span style={{flex:1,fontSize:12,fontFamily:SF,color:A.label2}}>Войдите для синхронизации между устройствами</span>
+          <button onClick={handleSignIn} style={{fontSize:12,fontFamily:SF,color:"#fff",background:A.blue,border:"none",cursor:"pointer",padding:"4px 12px",borderRadius:8,fontWeight:600,flexShrink:0}}>Google →</button>
+        </>
+      )}
+    </div>
+  ) : null;
+
   return (
     <>
       <style>{`
@@ -942,6 +1095,7 @@ export default function App() {
       `}</style>
 
       <div style={{background:A.bg,height:"100dvh",maxWidth:430,margin:"0 auto",fontFamily:SF,display:"flex",flexDirection:"column"}}>
+        {syncBar}
         <div style={{flex:1,overflowY:"auto",paddingBottom:84}}>
           {tab==="today"    && <TodayTab    dayData={todayData} onSave={d=>saveDayData(today,d)} allDaily={allDaily} streak={streak} cycleData={cycleData}/>}
           {tab==="calendar" && <CalendarTab allDaily={allDaily} cycleData={cycleData} saveDayData={saveDayData}/>}
