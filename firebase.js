@@ -6,12 +6,12 @@ import { getFirestore, doc, setDoc, getDoc, onSnapshot, collection } from "fireb
 // Включите Authentication > Google и Firestore Database
 // Затем вставьте сюда ваш конфиг из Project Settings > Your apps
 const firebaseConfig = {
-  apiKey: "ВСТАВЬТЕ_СЮДА",
-  authDomain: "ВСТАВЬТЕ_СЮДА",
-  projectId: "ВСТАВЬТЕ_СЮДА",
-  storageBucket: "ВСТАВЬТЕ_СЮДА",
-  messagingSenderId: "ВСТАВЬТЕ_СЮДА",
-  appId: "ВСТАВЬТЕ_СЮДА",
+  apiKey: "AIzaSyDhfu5fKnbaTA2aZYR7lekcSyEK0GbuYPQ",
+  authDomain: "my-calendar-sync-b88cd.firebaseapp.com",
+  projectId: "my-calendar-sync-b88cd",
+  storageBucket: "my-calendar-sync-b88cd.firebasestorage.app",
+  messagingSenderId: "965264661098",
+  appId: "1:965264661098:web:98e1708bb97f84f8288813",
 };
 
 let app, auth, db;
