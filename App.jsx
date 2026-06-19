@@ -78,32 +78,29 @@ const emptyDay = () => ({ todos:[], notes:"", eating:null, sport:{done:null,type
 
 function carryOverIncompleteTasks(allDaily, todayStr) {
   const today = allDaily[todayStr] || emptyDay();
+  if (today.carryoverDone === todayStr) return allDaily;
+
   const todayTodoIds = new Set((today.todos || []).map(t => t.id));
-  const newAllDaily = {...allDaily};
   const tasksToAdd = [];
 
   Object.entries(allDaily).forEach(([key, day]) => {
     if (key >= todayStr) return;
-    const pending = (day.todos || []).filter(t => !t.done && !t.carried);
-    if (pending.length === 0) return;
-    newAllDaily[key] = {
-      ...day,
-      todos: day.todos.map(t => (!t.done && !t.carried) ? {...t, carried: true} : t)
-    };
-    pending.forEach(t => {
-      if (!todayTodoIds.has(t.id)) {
-        tasksToAdd.push({...t, carried: false});
+    (day.todos || []).forEach(t => {
+      if (!t.done && !todayTodoIds.has(t.id)) {
+        tasksToAdd.push(t);
         todayTodoIds.add(t.id);
       }
     });
   });
 
-  if (tasksToAdd.length === 0 && Object.keys(newAllDaily).every(k => newAllDaily[k] === allDaily[k])) return allDaily;
-
-  if (tasksToAdd.length > 0) {
-    newAllDaily[todayStr] = {...today, todos: [...tasksToAdd, ...(today.todos || [])]};
-  }
-  return newAllDaily;
+  return {
+    ...allDaily,
+    [todayStr]: {
+      ...today,
+      carryoverDone: todayStr,
+      todos: [...tasksToAdd, ...(today.todos || [])]
+    }
+  };
 }
 
 const LargeTitle = ({children,style={}}) => <div style={{fontSize:34,fontWeight:700,letterSpacing:0.37,lineHeight:"41px",fontFamily:SF,color:A.label,...style}}>{children}</div>;
@@ -1014,7 +1011,10 @@ export default function App() {
         if (key === "all-daily") {
           const tk = todayKey();
           const carried = carryOverIncompleteTasks(val || {}, tk);
-          if (carried !== (val || {})) { _syncDisabled = true; try { localStorage.setItem(key, JSON.stringify(carried)); } catch {} _syncDisabled = false; }
+          _syncDisabled = true;
+          try { localStorage.setItem(key, JSON.stringify(carried)); } catch {}
+          _syncDisabled = false;
+          if (carried !== (val || {})) fbSet(key, carried);
           setAllDaily(carried);
           setStreak(computeStreak(carried, tk));
         } else if (key === "cycle-data") {
