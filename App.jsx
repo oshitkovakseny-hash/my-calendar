@@ -76,6 +76,36 @@ function computeStreak(allD, todayStr) {
 
 const emptyDay = () => ({ todos:[], notes:"", eating:null, sport:{done:null,type:""} });
 
+function carryOverIncompleteTasks(allDaily, todayStr) {
+  const today = allDaily[todayStr] || emptyDay();
+  const todayTodoIds = new Set((today.todos || []).map(t => t.id));
+  const newAllDaily = {...allDaily};
+  const tasksToAdd = [];
+
+  Object.entries(allDaily).forEach(([key, day]) => {
+    if (key >= todayStr) return;
+    const pending = (day.todos || []).filter(t => !t.done && !t.carried);
+    if (pending.length === 0) return;
+    newAllDaily[key] = {
+      ...day,
+      todos: day.todos.map(t => (!t.done && !t.carried) ? {...t, carried: true} : t)
+    };
+    pending.forEach(t => {
+      if (!todayTodoIds.has(t.id)) {
+        tasksToAdd.push({...t, carried: false});
+        todayTodoIds.add(t.id);
+      }
+    });
+  });
+
+  if (tasksToAdd.length === 0 && Object.keys(newAllDaily).every(k => newAllDaily[k] === allDaily[k])) return allDaily;
+
+  if (tasksToAdd.length > 0) {
+    newAllDaily[todayStr] = {...today, todos: [...tasksToAdd, ...(today.todos || [])]};
+  }
+  return newAllDaily;
+}
+
 const LargeTitle = ({children,style={}}) => <div style={{fontSize:34,fontWeight:700,letterSpacing:0.37,lineHeight:"41px",fontFamily:SF,color:A.label,...style}}>{children}</div>;
 const SectionHeader = ({children,style={}}) => <div style={{fontSize:13,fontWeight:400,color:A.label2,letterSpacing:-0.08,fontFamily:SF,padding:"0 16px 6px 20px",textTransform:"uppercase",...style}}>{children}</div>;
 const Card = ({children,style={}}) => <div style={{background:A.card,borderRadius:12,overflow:"hidden",...style}}>{children}</div>;
@@ -956,8 +986,10 @@ export default function App() {
   const today = todayKey();
 
   const loadLocal = useCallback(() => {
-    const ad = store.get("all-daily") || {};
+    let ad = store.get("all-daily") || {};
     const cd = store.get("cycle-data") || {startDates:[], length:28};
+    const carried = carryOverIncompleteTasks(ad, today);
+    if (carried !== ad) { ad = carried; store.set("all-daily", ad); }
     setAllDaily(ad); setCycleData(cd); setStreak(computeStreak(ad, today));
   }, [today]);
 
@@ -980,8 +1012,11 @@ export default function App() {
         try { localStorage.setItem(key, JSON.stringify(val)); } catch {}
         _syncDisabled = false;
         if (key === "all-daily") {
-          setAllDaily(val || {});
-          setStreak(computeStreak(val || {}, todayKey()));
+          const tk = todayKey();
+          const carried = carryOverIncompleteTasks(val || {}, tk);
+          if (carried !== (val || {})) { _syncDisabled = true; try { localStorage.setItem(key, JSON.stringify(carried)); } catch {} _syncDisabled = false; }
+          setAllDaily(carried);
+          setStreak(computeStreak(carried, tk));
         } else if (key === "cycle-data") {
           setCycleData(val || {startDates:[], length:28});
         }
