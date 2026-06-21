@@ -78,29 +78,19 @@ const emptyDay = () => ({ todos:[], notes:"", eating:null, sport:{done:null,type
 
 function carryOverIncompleteTasks(allDaily, todayStr) {
   const today = allDaily[todayStr] || emptyDay();
-  if (today.carryoverDone === todayStr) return allDaily;
-
   const todayTodoIds = new Set((today.todos || []).map(t => t.id));
-  const tasksToAdd = [];
-
+  const carried = [];
   Object.entries(allDaily).forEach(([key, day]) => {
     if (key >= todayStr) return;
     (day.todos || []).forEach(t => {
       if (!t.done && !todayTodoIds.has(t.id)) {
-        tasksToAdd.push(t);
+        carried.push(t);
         todayTodoIds.add(t.id);
       }
     });
   });
-
-  return {
-    ...allDaily,
-    [todayStr]: {
-      ...today,
-      carryoverDone: todayStr,
-      todos: [...tasksToAdd, ...(today.todos || [])]
-    }
-  };
+  if (carried.length === 0) return today;
+  return {...today, todos: [...carried, ...(today.todos || [])]};
 }
 
 const LargeTitle = ({children,style={}}) => <div style={{fontSize:34,fontWeight:700,letterSpacing:0.37,lineHeight:"41px",fontFamily:SF,color:A.label,...style}}>{children}</div>;
@@ -983,10 +973,8 @@ export default function App() {
   const today = todayKey();
 
   const loadLocal = useCallback(() => {
-    let ad = store.get("all-daily") || {};
+    const ad = store.get("all-daily") || {};
     const cd = store.get("cycle-data") || {startDates:[], length:28};
-    const carried = carryOverIncompleteTasks(ad, today);
-    if (carried !== ad) { ad = carried; store.set("all-daily", ad); }
     setAllDaily(ad); setCycleData(cd); setStreak(computeStreak(ad, today));
   }, [today]);
 
@@ -1010,13 +998,8 @@ export default function App() {
         _syncDisabled = false;
         if (key === "all-daily") {
           const tk = todayKey();
-          const carried = carryOverIncompleteTasks(val || {}, tk);
-          _syncDisabled = true;
-          try { localStorage.setItem(key, JSON.stringify(carried)); } catch {}
-          _syncDisabled = false;
-          if (carried !== (val || {})) fbSet(key, carried);
-          setAllDaily(carried);
-          setStreak(computeStreak(carried, tk));
+          setAllDaily(val || {});
+          setStreak(computeStreak(val || {}, todayKey()));
         } else if (key === "cycle-data") {
           setCycleData(val || {startDates:[], length:28});
         }
@@ -1086,7 +1069,7 @@ export default function App() {
   }, [today]);
 
   const saveCycle = useCallback(c => { setCycleData(c); store.set("cycle-data", c); }, []);
-  const todayData = allDaily[today] || emptyDay();
+  const todayData = carryOverIncompleteTasks(allDaily, today);
 
   const tabs = [
     {id:"today",    icon:"◉", label:"Сегодня"},
