@@ -80,15 +80,18 @@ function carryOverIncompleteTasks(allDaily, todayStr) {
   const today = allDaily[todayStr] || emptyDay();
   const todayTodoIds = new Set((today.todos || []).map(t => t.id));
   const carried = [];
+  console.log("[carryover] todayStr=", todayStr, "allDaily keys=", Object.keys(allDaily));
   Object.entries(allDaily).forEach(([key, day]) => {
     if (key >= todayStr) return;
     (day.todos || []).forEach(t => {
+      console.log("[carryover] checking task from", key, ":", t.text, "done=", t.done);
       if (!t.done && !todayTodoIds.has(t.id)) {
         carried.push(t);
         todayTodoIds.add(t.id);
       }
     });
   });
+  console.log("[carryover] tasks to carry:", carried.map(t => t.text));
   if (carried.length === 0) return today;
   return {...today, todos: [...carried, ...(today.todos || [])]};
 }
