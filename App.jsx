@@ -76,30 +76,6 @@ function computeStreak(allD, todayStr) {
 
 const emptyDay = () => ({ todos:[], notes:"", eating:null, sport:{done:null,type:""} });
 
-function carryOverIncompleteTasks(allDaily, todayStr) {
-  const today = allDaily[todayStr] || emptyDay();
-  const todayTodoIds = new Set((today.todos || []).map(t => t.id));
-
-  // Collect IDs of tasks completed in ANY day — they should not be re-carried
-  const completedIds = new Set();
-  Object.values(allDaily).forEach(day => {
-    (day.todos || []).forEach(t => { if (t.done) completedIds.add(t.id); });
-  });
-
-  const carried = [];
-  Object.entries(allDaily).forEach(([key, day]) => {
-    if (key >= todayStr) return;
-    (day.todos || []).forEach(t => {
-      if (!t.done && !completedIds.has(t.id) && !todayTodoIds.has(t.id)) {
-        carried.push(t);
-        todayTodoIds.add(t.id);
-      }
-    });
-  });
-
-  if (carried.length === 0) return today;
-  return {...today, todos: [...carried, ...(today.todos || [])]};
-}
 
 const LargeTitle = ({children,style={}}) => <div style={{fontSize:34,fontWeight:700,letterSpacing:0.37,lineHeight:"41px",fontFamily:SF,color:A.label,...style}}>{children}</div>;
 const SectionHeader = ({children,style={}}) => <div style={{fontSize:13,fontWeight:400,color:A.label2,letterSpacing:-0.08,fontFamily:SF,padding:"0 16px 6px 20px",textTransform:"uppercase",...style}}>{children}</div>;
@@ -1077,7 +1053,32 @@ export default function App() {
   }, [today]);
 
   const saveCycle = useCallback(c => { setCycleData(c); store.set("cycle-data", c); }, []);
-  const todayData = carryOverIncompleteTasks(allDaily, today);
+
+  // Carryover: runs after allDaily loads, saves result to storage so it persists
+  useEffect(() => {
+    if (Object.keys(allDaily).length === 0) return;
+    const todayDay = allDaily[today] || emptyDay();
+    if (todayDay.carryoverDate === today) return; // already done today
+
+    const todayTodoIds = new Set((todayDay.todos || []).map(t => t.id));
+    const completedIds = new Set();
+    Object.values(allDaily).forEach(day => {
+      (day.todos || []).forEach(t => { if (t.done) completedIds.add(t.id); });
+    });
+    const carried = [];
+    Object.entries(allDaily).forEach(([key, day]) => {
+      if (key >= today) return;
+      (day.todos || []).forEach(t => {
+        if (!t.done && !completedIds.has(t.id) && !todayTodoIds.has(t.id)) {
+          carried.push(t);
+          todayTodoIds.add(t.id);
+        }
+      });
+    });
+    saveDayData(today, {...todayDay, carryoverDate: today, todos: [...carried, ...(todayDay.todos || [])]});
+  }, [allDaily, today, saveDayData]);
+
+  const todayData = allDaily[today] || emptyDay();
 
   const tabs = [
     {id:"today",    icon:"◉", label:"Сегодня"},
