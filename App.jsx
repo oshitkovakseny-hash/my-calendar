@@ -105,7 +105,7 @@ function SegmentedControl({options,value,onChange}) {
   </div>;
 }
 
-function TaskList({dayData, onSave}) {
+function TaskList({dayData, onSave, currentKey, onMoveTask}) {
   const [newTodo, setNewTodo] = useState("");
   const [newTag, setNewTag] = useState(null);
   const [expandedId, setExpandedId] = useState(null);
@@ -168,6 +168,9 @@ function TaskList({dayData, onSave}) {
               </div>
               {isOpen && (
                 <div style={{padding:"0 16px 14px 50px",background:A.bg}}>
+                  <div style={{fontSize:12,color:A.label2,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:6}}>Текст задачи</div>
+                  <input value={t.text||""} onChange={e=>updateField(t.id,"text",e.target.value)} placeholder="Название задачи"
+                    style={{width:"100%",background:A.card,border:`1px solid ${A.sep}`,borderRadius:10,padding:"10px 12px",fontSize:15,fontFamily:SF,color:A.label,boxSizing:"border-box",outline:"none",display:"block",marginBottom:10}}/>
                   <div style={{marginBottom:10}}>
                     <div style={{fontSize:12,color:A.label2,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:6}}>Тег</div>
                     <div style={{display:"flex",gap:6}}>
@@ -188,6 +191,13 @@ function TaskList({dayData, onSave}) {
                       style={{flex:1,border:"none",background:"transparent",fontSize:15,fontFamily:SF,color:A.blue,outline:"none"}}/>
                   </div>
                   {t.link && <a href={t.link.startsWith("http")?t.link:`https://${t.link}`} target="_blank" rel="noreferrer" style={{display:"inline-block",marginTop:6,fontSize:13,fontFamily:SF,color:A.blue}}>Открыть ↗</a>}
+                  {onMoveTask && (
+                    <>
+                      <div style={{fontSize:12,color:A.label2,textTransform:"uppercase",letterSpacing:"0.06em",marginTop:10,marginBottom:6}}>Перенести на день</div>
+                      <input type="date" value={t._src || currentKey || ""} onChange={e=>{ if(e.target.value) onMoveTask(t.id, t._src || currentKey, e.target.value); }}
+                        style={{width:"100%",background:A.card,border:`1px solid ${A.sep}`,borderRadius:10,padding:"10px 12px",fontSize:15,fontFamily:SF,color:A.label,boxSizing:"border-box",outline:"none",display:"block"}}/>
+                    </>
+                  )}
                   <button onClick={()=>del(t.id)} style={{marginTop:12,display:"block",color:A.red,background:"none",border:"none",cursor:"pointer",fontSize:15,fontFamily:SF,padding:0}}>Удалить задачу</button>
                 </div>
               )}
@@ -259,7 +269,7 @@ function EatingCard({dayData, onSave, allDaily, streak}) {
   );
 }
 
-function TodayTab({dayData, onSave, allDaily, streak, cycleData}) {
+function TodayTab({dayData, onSave, allDaily, streak, cycleData, today, moveTask}) {
   const now = new Date(), phase = getCyclePhase(now, cycleData);
   return (
     <div style={{paddingBottom:100}}>
@@ -275,7 +285,7 @@ function TodayTab({dayData, onSave, allDaily, streak, cycleData}) {
       </div>
       <div style={{padding:"8px 16px 0"}}><SectionHeader>Питание</SectionHeader><EatingCard dayData={dayData} onSave={onSave} allDaily={allDaily} streak={streak}/></div>
       <div style={{padding:"20px 16px 0"}}><SectionHeader>Спорт</SectionHeader><SportControl dayData={dayData} onSave={onSave}/></div>
-      <div style={{padding:"20px 16px 0"}}><TaskList dayData={dayData} onSave={onSave}/></div>
+      <div style={{padding:"20px 16px 0"}}><TaskList dayData={dayData} onSave={onSave} currentKey={today} onMoveTask={moveTask}/></div>
       <div style={{padding:"20px 16px 0"}}>
         <SectionHeader>Заметки дня</SectionHeader>
         <Card>
@@ -287,7 +297,7 @@ function TodayTab({dayData, onSave, allDaily, streak, cycleData}) {
   );
 }
 
-function CalendarTab({allDaily, cycleData, saveDayData}) {
+function CalendarTab({allDaily, cycleData, saveDayData, moveTask}) {
   const [calMonth, setCalMonth] = useState(new Date());
   const [selectedDay, setSelectedDay] = useState(new Date());
   const todayD = new Date();
@@ -346,7 +356,7 @@ function CalendarTab({allDaily, cycleData, saveDayData}) {
             <div style={{fontSize:22,fontWeight:700,fontFamily:SF,color:A.label,letterSpacing:-0.4}}>{isSelToday?"Сегодня":`${selectedDay.getDate()} ${MONTHS_G[selectedDay.getMonth()]}`}</div>
             {selPhase&&<span style={{fontSize:13,fontFamily:SF,fontWeight:500,color:selPhase.color}}>{selPhase.label} · день {selPhase.day}</span>}
           </div>
-          <div style={{padding:"8px 16px 0"}}><TaskList dayData={selData} onSave={d=>saveDayData(selKey,d)}/></div>
+          <div style={{padding:"8px 16px 0"}}><TaskList dayData={selData} onSave={d=>saveDayData(selKey,d)} currentKey={selKey} onMoveTask={moveTask}/></div>
         </div>
       )}
     </div>
@@ -1104,6 +1114,24 @@ export default function App() {
     });
   }, [today]);
 
+  // Перенос задачи на другой день: убираем из дня-источника, кладём в целевой.
+  const moveTask = useCallback((taskId, fromKey, toKey) => {
+    if (!toKey || fromKey === toKey) return;
+    setAllDaily(prev => {
+      const fromDay = prev[fromKey] || emptyDay();
+      const task = (fromDay.todos || []).find(t => t.id === taskId);
+      if (!task) return prev;
+      const {_src, ...clean} = task;
+      const na = {...prev};
+      na[fromKey] = {...fromDay, todos: (fromDay.todos || []).filter(t => t.id !== taskId)};
+      const toDay = na[toKey] || emptyDay();
+      na[toKey] = {...toDay, todos: [...(toDay.todos || []), clean]};
+      store.set("all-daily", na);
+      setStreak(computeStreak(na, today));
+      return na;
+    });
+  }, [today]);
+
   const tabs = [
     {id:"today",    icon:"◉", label:"Сегодня"},
     {id:"calendar", icon:"▦", label:"Календарь"},
@@ -1148,8 +1176,8 @@ export default function App() {
       <div style={{background:A.bg,height:"100dvh",maxWidth:430,margin:"0 auto",fontFamily:SF,display:"flex",flexDirection:"column"}}>
         {syncBar}
         <div style={{flex:1,overflowY:"auto",paddingBottom:84}}>
-          {tab==="today"    && <TodayTab    dayData={todayData} onSave={saveToday} allDaily={allDaily} streak={streak} cycleData={cycleData}/>}
-          {tab==="calendar" && <CalendarTab allDaily={allDaily} cycleData={cycleData} saveDayData={saveDayData}/>}
+          {tab==="today"    && <TodayTab    dayData={todayData} onSave={saveToday} allDaily={allDaily} streak={streak} cycleData={cycleData} today={today} moveTask={moveTask}/>}
+          {tab==="calendar" && <CalendarTab allDaily={allDaily} cycleData={cycleData} saveDayData={saveDayData} moveTask={moveTask}/>}
           {tab==="settings" && <SettingsTab cycleData={cycleData} saveCycle={saveCycle} allDaily={allDaily} streak={streak}/>}
           {tab==="finance"  && <FinanceTab/>}
           {tab==="wishlist" && <WishlistTab/>}
