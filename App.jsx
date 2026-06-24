@@ -1058,24 +1058,28 @@ export default function App() {
   useEffect(() => {
     if (Object.keys(allDaily).length === 0) return;
     const todayDay = allDaily[today] || emptyDay();
-    if (todayDay.carryoverDate === today) return; // already done today
+    if (todayDay.carryoverDate === today + "v2") return; // already done today
+
+    // IDs of tasks done in ANY day — these must never be re-carried
+    const doneEverIds = new Set();
+    Object.values(allDaily).forEach(day => {
+      (day.todos || []).forEach(t => { if (t.done) doneEverIds.add(t.id); });
+    });
 
     const todayTodoIds = new Set((todayDay.todos || []).map(t => t.id));
-    const completedIds = new Set();
-    Object.values(allDaily).forEach(day => {
-      (day.todos || []).forEach(t => { if (t.done) completedIds.add(t.id); });
-    });
     const carried = [];
     Object.entries(allDaily).forEach(([key, day]) => {
       if (key >= today) return;
       (day.todos || []).forEach(t => {
-        if (!t.done && !completedIds.has(t.id) && !todayTodoIds.has(t.id)) {
-          carried.push(t);
+        if (!doneEverIds.has(t.id) && !todayTodoIds.has(t.id)) {
+          carried.push({...t, done: false});
           todayTodoIds.add(t.id);
         }
       });
     });
-    saveDayData(today, {...todayDay, carryoverDate: today, todos: [...carried, ...(todayDay.todos || [])]});
+    // Remove previously mis-carried done tasks from today, then add correctly carried ones
+    const cleanTodayTodos = (todayDay.todos || []).filter(t => !doneEverIds.has(t.id) || t.done);
+    saveDayData(today, {...todayDay, carryoverDate: today + "v2", todos: [...carried, ...cleanTodayTodos]});
   }, [allDaily, today, saveDayData]);
 
   const todayData = allDaily[today] || emptyDay();
