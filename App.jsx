@@ -1068,7 +1068,11 @@ export default function App() {
       }
     });
   });
-  const todayData = {...realToday, todos: [...carriedOpen, ...(realToday.todos || []).filter(t => !carriedIds.has(t.id))]};
+  // На "Сегодня" показываем ТОЛЬКО невыполненные задачи: перенесённые открытые
+  // из прошлого + открытые задачи самого сегодняшнего дня. Закрытые не показываем
+  // (они не удаляются — остаются в своём дне, видны в Календаре).
+  const todayOpen = (realToday.todos || []).filter(t => !t.done && !carriedIds.has(t.id));
+  const todayData = {...realToday, todos: [...carriedOpen, ...todayOpen]};
 
   // При любом изменении на вкладке "Сегодня":
   // - задачи без _src (родные) → пишем в allDaily[today]
@@ -1078,7 +1082,11 @@ export default function App() {
       const na = {...prev};
       const incoming = data.todos || [];
       const native = incoming.filter(t => !t._src);
-      na[today] = {...(prev[today] || emptyDay()), notes: data.notes, eating: data.eating, sport: data.sport, todos: native};
+      // Выполненные задачи сегодняшнего дня не показываются в списке, но их нельзя
+      // терять — сохраняем те done-задачи, которых нет в видимом списке.
+      const incomingIds = new Set(incoming.map(t => t.id));
+      const preservedDone = ((prev[today] || emptyDay()).todos || []).filter(t => t.done && !incomingIds.has(t.id));
+      na[today] = {...(prev[today] || emptyDay()), notes: data.notes, eating: data.eating, sport: data.sport, todos: [...native, ...preservedDone]};
       const bySrc = {};
       incoming.filter(t => t._src).forEach(t => { (bySrc[t._src] = bySrc[t._src] || []).push(t); });
       // Все прошлые дни с открытыми задачами — пересчитываем их
