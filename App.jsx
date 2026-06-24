@@ -297,7 +297,7 @@ function TodayTab({dayData, onSave, allDaily, streak, cycleData, today, moveTask
   );
 }
 
-function CalendarTab({allDaily, cycleData, saveDayData, moveTask}) {
+function CalendarTab({allDaily, cycleData, saveDayData, saveDayView, moveTask}) {
   const [calMonth, setCalMonth] = useState(new Date());
   const [selectedDay, setSelectedDay] = useState(new Date());
   const todayD = new Date();
@@ -310,9 +310,30 @@ function CalendarTab({allDaily, cycleData, saveDayData, moveTask}) {
   for (let i=1; i<=lastDay.getDate(); i++) days.push(new Date(calMonth.getFullYear(), calMonth.getMonth(), i));
 
   const selKey = selectedDay ? toKey(selectedDay) : null;
-  const selData = (selKey && allDaily[selKey]) || emptyDay();
+  const todayKey = toKey(todayD);
   const selPhase = selectedDay ? getCyclePhase(selectedDay, cycleData) : null;
-  const isSelToday = selKey === toKey(todayD);
+  const isSelToday = selKey === todayKey;
+
+  // Вычисляем carryover для выбранного дня (аналог todayData в App)
+  const realSel = (selKey && allDaily[selKey]) || emptyDay();
+  let selData;
+  if (selKey && selKey <= todayKey) {
+    const carried = [];
+    const carriedIds = new Set();
+    Object.entries(allDaily).forEach(([key, day]) => {
+      if (key >= selKey) return;
+      (day.todos || []).forEach(t => {
+        if (!t.done && !carriedIds.has(t.id)) {
+          carried.push({...t, _src: key});
+          carriedIds.add(t.id);
+        }
+      });
+    });
+    const ownOpen = (realSel.todos || []).filter(t => !t.done && !carriedIds.has(t.id));
+    selData = {...realSel, todos: [...carried, ...ownOpen]};
+  } else {
+    selData = realSel;
+  }
 
   return (
     <div style={{paddingBottom:100}}>
@@ -356,7 +377,7 @@ function CalendarTab({allDaily, cycleData, saveDayData, moveTask}) {
             <div style={{fontSize:22,fontWeight:700,fontFamily:SF,color:A.label,letterSpacing:-0.4}}>{isSelToday?"Сегодня":`${selectedDay.getDate()} ${MONTHS_G[selectedDay.getMonth()]}`}</div>
             {selPhase&&<span style={{fontSize:13,fontFamily:SF,fontWeight:500,color:selPhase.color}}>{selPhase.label} · день {selPhase.day}</span>}
           </div>
-          <div style={{padding:"8px 16px 0"}}><TaskList dayData={selData} onSave={d=>saveDayData(selKey,d)} currentKey={selKey} onMoveTask={moveTask}/></div>
+          <div style={{padding:"8px 16px 0"}}><TaskList dayData={selData} onSave={selKey<=todayKey ? d=>saveDayView(selKey,d) : d=>saveDayData(selKey,d)} currentKey={selKey} onMoveTask={moveTask}/></div>
         </div>
       )}
     </div>
@@ -1114,6 +1135,31 @@ export default function App() {
     });
   }, [today]);
 
+  // Аналог saveToday, но для произвольного дня selKey (вкладка Календарь).
+  const saveDayView = useCallback((selKey, data) => {
+    setAllDaily(prev => {
+      const na = {...prev};
+      const incoming = data.todos || [];
+      const native = incoming.filter(t => !t._src);
+      const incomingIds = new Set(incoming.map(t => t.id));
+      const preservedDone = ((prev[selKey] || emptyDay()).todos || []).filter(t => t.done && !incomingIds.has(t.id));
+      na[selKey] = {...(prev[selKey] || emptyDay()), notes: data.notes, eating: data.eating, sport: data.sport, todos: [...native, ...preservedDone]};
+      const bySrc = {};
+      incoming.filter(t => t._src).forEach(t => { (bySrc[t._src] = bySrc[t._src] || []).push(t); });
+      Object.keys(prev).forEach(key => {
+        if (key >= selKey) return;
+        const prevOpen = (prev[key].todos || []).filter(t => !t.done);
+        if (prevOpen.length === 0 && !bySrc[key]) return;
+        const keptDone = (prev[key].todos || []).filter(t => t.done);
+        const edited = (bySrc[key] || []).map(({_src, ...t}) => t);
+        na[key] = {...prev[key], todos: [...keptDone, ...edited]};
+      });
+      store.set("all-daily", na);
+      setStreak(computeStreak(na, today));
+      return na;
+    });
+  }, [today]);
+
   // Перенос задачи на другой день: убираем из дня-источника, кладём в целевой.
   const moveTask = useCallback((taskId, fromKey, toKey) => {
     if (!toKey || fromKey === toKey) return;
@@ -1177,7 +1223,7 @@ export default function App() {
         {syncBar}
         <div style={{flex:1,overflowY:"auto",paddingBottom:84}}>
           {tab==="today"    && <TodayTab    dayData={todayData} onSave={saveToday} allDaily={allDaily} streak={streak} cycleData={cycleData} today={today} moveTask={moveTask}/>}
-          {tab==="calendar" && <CalendarTab allDaily={allDaily} cycleData={cycleData} saveDayData={saveDayData} moveTask={moveTask}/>}
+          {tab==="calendar" && <CalendarTab allDaily={allDaily} cycleData={cycleData} saveDayData={saveDayData} saveDayView={saveDayView} moveTask={moveTask}/>}
           {tab==="settings" && <SettingsTab cycleData={cycleData} saveCycle={saveCycle} allDaily={allDaily} streak={streak}/>}
           {tab==="finance"  && <FinanceTab/>}
           {tab==="wishlist" && <WishlistTab/>}
