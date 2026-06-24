@@ -76,6 +76,30 @@ function computeStreak(allD, todayStr) {
 
 const emptyDay = () => ({ todos:[], notes:"", eating:null, sport:{done:null,type:""} });
 
+// Нормализация: каждая задача должна храниться РОВНО в одном дне — дне своего
+// создания (id задачи = Date.now() в момент создания). Чинит повреждённые данные,
+// где задачи были скопированы/свалены в один день. Идемпотентна.
+function normalizeStorage(allDaily) {
+  const byId = new Map(); // id -> лучшая версия (выполненная важнее открытой)
+  Object.values(allDaily).forEach(day => {
+    (day.todos || []).forEach(t => {
+      const ex = byId.get(t.id);
+      if (!ex) byId.set(t.id, t);
+      else if (t.done && !ex.done) byId.set(t.id, t);
+    });
+  });
+  const nd = {};
+  Object.entries(allDaily).forEach(([k, d]) => { nd[k] = {...d, todos: []}; });
+  byId.forEach((t, id) => {
+    let homeKey;
+    if (typeof id === "number" && id > 1e12 && id < 4e12) homeKey = toKey(new Date(id));
+    else homeKey = todayKey(); // запасной вариант для нестандартных id
+    if (!nd[homeKey]) nd[homeKey] = {...emptyDay()};
+    nd[homeKey].todos.push(t);
+  });
+  return nd;
+}
+
 
 const LargeTitle = ({children,style={}}) => <div style={{fontSize:34,fontWeight:700,letterSpacing:0.37,lineHeight:"41px",fontFamily:SF,color:A.label,...style}}>{children}</div>;
 const SectionHeader = ({children,style={}}) => <div style={{fontSize:13,fontWeight:400,color:A.label2,letterSpacing:-0.08,fontFamily:SF,padding:"0 16px 6px 20px",textTransform:"uppercase",...style}}>{children}</div>;
@@ -954,6 +978,7 @@ export default function App() {
   const [syncStatus, setSyncStatus] = useState("idle"); // idle | syncing | synced | error
   const [authLoading, setAuthLoading] = useState(FIREBASE_CONFIGURED);
   const unsubSnapshotsRef = useRef([]);
+  const migratedRef = useRef(false);
   const today = todayKey();
 
   const loadLocal = useCallback(() => {
@@ -1054,51 +1079,78 @@ export default function App() {
 
   const saveCycle = useCallback(c => { setCycleData(c); store.set("cycle-data", c); }, []);
 
-  // Carryover: each task lives in exactly ONE day.
-  //  - open tasks (never marked done in any day) -> moved to today
-  //  - done tasks -> kept in the day they were completed (latest such day)
-  // This prevents done-elsewhere copies from lingering and stops "resurrection".
-  useEffect(() => {
-    if (Object.keys(allDaily).length === 0) return;
-    const todayDay = allDaily[today] || emptyDay();
-    if (todayDay.carryoverDate === today + "v3") return; // already reconciled today
+  // --- Перенос задач (без изменения хранилища) ---
+  // Задачи НИКОГДА не двигаются между днями в хранилище: каждая остаётся
+  // в том дне, где создана. На вкладке "Сегодня" мы лишь ПОКАЗЫВАЕМ открытые
+  // (невыполненные) задачи из прошлых дней. Каждой такой задаче добавляется
+  // пометка _src — ключ её родного дня, чтобы при изменении (галочка/правка/
+  // удаление) записать результат обратно именно туда.
+  const carriedOpen = [];
+  Object.entries(allDaily).forEach(([key, day]) => {
+    if (key >= today) return;
+    (day.todos || []).forEach(t => {
+      if (!t.done) carriedOpen.push({...t, _src: key});
+    });
+  });
+  const realToday = allDaily[today] || emptyDay();
+  const todayData = {...realToday, todos: [...carriedOpen, ...(realToday.todos || [])]};
 
-    // Group every occurrence of a task id across all days
-    const byId = new Map();
-    Object.entries(allDaily).forEach(([key, day]) => {
-      (day.todos || []).forEach(t => {
-        let e = byId.get(t.id);
-        if (!e) { e = {doneKey:null, doneTask:null, openTask:null}; byId.set(t.id, e); }
-        if (t.done) {
-          if (!e.doneKey || key > e.doneKey) { e.doneKey = key; e.doneTask = t; }
-        } else if (!e.openTask) {
-          e.openTask = t;
-        }
+  // Сохранение для вкладки "Сегодня": разводит задачи по их родным дням.
+  const saveToday = useCallback((data) => {
+    setAllDaily(prev => {
+      const na = {...prev};
+      const incoming = data.todos || [];
+
+      // 1) Задачи, рождённые сегодня (без _src) — пишем в сегодняшний день.
+      const todayNative = incoming.filter(t => !t._src);
+      na[today] = {
+        ...(prev[today] || emptyDay()),
+        notes: data.notes,
+        eating: data.eating,
+        sport: data.sport,
+        todos: todayNative,
+      };
+
+      // 2) Перенесённые задачи — группируем по родному дню (_src).
+      const bySrc = {};
+      incoming.forEach(t => {
+        if (t._src) (bySrc[t._src] = bySrc[t._src] || []).push(t);
       });
+
+      // Дни, которые надо перестроить: те, что сейчас в выдаче + те, что
+      // раньше имели открытые задачи (вдруг все их открытые удалили).
+      const srcKeys = new Set(Object.keys(bySrc));
+      Object.keys(prev).forEach(key => {
+        if (key >= today) return;
+        if ((prev[key].todos || []).some(t => !t.done)) srcKeys.add(key);
+      });
+
+      srcKeys.forEach(key => {
+        const stored = prev[key] || emptyDay();
+        const keptDone = (stored.todos || []).filter(t => t.done); // done остаются дома
+        const edited = (bySrc[key] || []).map(({_src, ...t}) => t); // открытые (возможно изменённые)
+        na[key] = {...stored, todos: [...keptDone, ...edited]};
+      });
+
+      store.set("all-daily", na);
+      setStreak(computeStreak(na, today));
+      return na;
     });
+  }, [today]);
 
-    // Rebuild every day's todo list with one home per task
-    const newDays = {};
-    Object.keys(allDaily).forEach(key => { newDays[key] = {...allDaily[key], todos: []}; });
-    if (!newDays[today]) newDays[today] = {...emptyDay()};
-
-    byId.forEach(e => {
-      if (e.doneTask) {
-        if (!newDays[e.doneKey]) newDays[e.doneKey] = {...emptyDay()};
-        newDays[e.doneKey].todos.push({...e.doneTask, done:true});
-      } else {
-        newDays[today].todos.push({...e.openTask, done:false});
-      }
-    });
-
-    newDays[today] = {...newDays[today], carryoverDate: today + "v3"};
-
-    setAllDaily(newDays);
-    store.set("all-daily", newDays);
-    setStreak(computeStreak(newDays, today));
+  // Одноразовая починка повреждённых данных: возвращает каждую задачу в её
+  // родной день (по id-времени создания). Запускается один раз после загрузки.
+  useEffect(() => {
+    if (migratedRef.current) return;
+    if (Object.keys(allDaily).length === 0) return;
+    migratedRef.current = true;
+    const normalized = normalizeStorage(allDaily);
+    if (JSON.stringify(normalized) !== JSON.stringify(allDaily)) {
+      setAllDaily(normalized);
+      store.set("all-daily", normalized);
+      setStreak(computeStreak(normalized, today));
+    }
   }, [allDaily, today]);
-
-  const todayData = allDaily[today] || emptyDay();
 
   const tabs = [
     {id:"today",    icon:"◉", label:"Сегодня"},
@@ -1144,7 +1196,7 @@ export default function App() {
       <div style={{background:A.bg,height:"100dvh",maxWidth:430,margin:"0 auto",fontFamily:SF,display:"flex",flexDirection:"column"}}>
         {syncBar}
         <div style={{flex:1,overflowY:"auto",paddingBottom:84}}>
-          {tab==="today"    && <TodayTab    dayData={todayData} onSave={d=>saveDayData(today,d)} allDaily={allDaily} streak={streak} cycleData={cycleData}/>}
+          {tab==="today"    && <TodayTab    dayData={todayData} onSave={saveToday} allDaily={allDaily} streak={streak} cycleData={cycleData}/>}
           {tab==="calendar" && <CalendarTab allDaily={allDaily} cycleData={cycleData} saveDayData={saveDayData}/>}
           {tab==="settings" && <SettingsTab cycleData={cycleData} saveCycle={saveCycle} allDaily={allDaily} streak={streak}/>}
           {tab==="finance"  && <FinanceTab/>}
