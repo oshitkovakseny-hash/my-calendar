@@ -76,30 +76,6 @@ function computeStreak(allD, todayStr) {
 
 const emptyDay = () => ({ todos:[], notes:"", eating:null, sport:{done:null,type:""} });
 
-// Нормализация: каждая задача должна храниться РОВНО в одном дне — дне своего
-// создания (id задачи = Date.now() в момент создания). Чинит повреждённые данные,
-// где задачи были скопированы/свалены в один день. Идемпотентна.
-function normalizeStorage(allDaily) {
-  const byId = new Map(); // id -> лучшая версия (выполненная важнее открытой)
-  Object.values(allDaily).forEach(day => {
-    (day.todos || []).forEach(t => {
-      const ex = byId.get(t.id);
-      if (!ex) byId.set(t.id, t);
-      else if (t.done && !ex.done) byId.set(t.id, t);
-    });
-  });
-  const nd = {};
-  Object.entries(allDaily).forEach(([k, d]) => { nd[k] = {...d, todos: []}; });
-  byId.forEach((t, id) => {
-    let homeKey;
-    if (typeof id === "number" && id > 1e12 && id < 4e12) homeKey = toKey(new Date(id));
-    else homeKey = todayKey(); // запасной вариант для нестандартных id
-    if (!nd[homeKey]) nd[homeKey] = {...emptyDay()};
-    nd[homeKey].todos.push(t);
-  });
-  return nd;
-}
-
 
 const LargeTitle = ({children,style={}}) => <div style={{fontSize:34,fontWeight:700,letterSpacing:0.37,lineHeight:"41px",fontFamily:SF,color:A.label,...style}}>{children}</div>;
 const SectionHeader = ({children,style={}}) => <div style={{fontSize:13,fontWeight:400,color:A.label2,letterSpacing:-0.08,fontFamily:SF,padding:"0 16px 6px 20px",textTransform:"uppercase",...style}}>{children}</div>;
@@ -978,7 +954,6 @@ export default function App() {
   const [syncStatus, setSyncStatus] = useState("idle"); // idle | syncing | synced | error
   const [authLoading, setAuthLoading] = useState(FIREBASE_CONFIGURED);
   const unsubSnapshotsRef = useRef([]);
-  const migratedRef = useRef(false);
   const today = todayKey();
 
   const loadLocal = useCallback(() => {
@@ -1079,78 +1054,47 @@ export default function App() {
 
   const saveCycle = useCallback(c => { setCycleData(c); store.set("cycle-data", c); }, []);
 
-  // --- Перенос задач (без изменения хранилища) ---
-  // Задачи НИКОГДА не двигаются между днями в хранилище: каждая остаётся
-  // в том дне, где создана. На вкладке "Сегодня" мы лишь ПОКАЗЫВАЕМ открытые
-  // (невыполненные) задачи из прошлых дней. Каждой такой задаче добавляется
-  // пометка _src — ключ её родного дня, чтобы при изменении (галочка/правка/
-  // удаление) записать результат обратно именно туда.
+  // Перенос: только показываем невыполненные задачи прошлых дней — НИЧЕГО не двигаем в хранилище.
+  // _src = ключ дня, где задача реально хранится.
+  const realToday = allDaily[today] || emptyDay();
   const carriedOpen = [];
+  const carriedIds = new Set();
   Object.entries(allDaily).forEach(([key, day]) => {
     if (key >= today) return;
     (day.todos || []).forEach(t => {
-      if (!t.done) carriedOpen.push({...t, _src: key});
+      if (!t.done && !carriedIds.has(t.id)) {
+        carriedOpen.push({...t, _src: key});
+        carriedIds.add(t.id);
+      }
     });
   });
-  const realToday = allDaily[today] || emptyDay();
-  const todayData = {...realToday, todos: [...carriedOpen, ...(realToday.todos || [])]};
+  const todayData = {...realToday, todos: [...carriedOpen, ...(realToday.todos || []).filter(t => !carriedIds.has(t.id))]};
 
-  // Сохранение для вкладки "Сегодня": разводит задачи по их родным дням.
+  // При любом изменении на вкладке "Сегодня":
+  // - задачи без _src (родные) → пишем в allDaily[today]
+  // - задачи с _src (перенесённые) → пишем обратно в их родной день
   const saveToday = useCallback((data) => {
     setAllDaily(prev => {
       const na = {...prev};
       const incoming = data.todos || [];
-
-      // 1) Задачи, рождённые сегодня (без _src) — пишем в сегодняшний день.
-      const todayNative = incoming.filter(t => !t._src);
-      na[today] = {
-        ...(prev[today] || emptyDay()),
-        notes: data.notes,
-        eating: data.eating,
-        sport: data.sport,
-        todos: todayNative,
-      };
-
-      // 2) Перенесённые задачи — группируем по родному дню (_src).
+      const native = incoming.filter(t => !t._src);
+      na[today] = {...(prev[today] || emptyDay()), notes: data.notes, eating: data.eating, sport: data.sport, todos: native};
       const bySrc = {};
-      incoming.forEach(t => {
-        if (t._src) (bySrc[t._src] = bySrc[t._src] || []).push(t);
-      });
-
-      // Дни, которые надо перестроить: те, что сейчас в выдаче + те, что
-      // раньше имели открытые задачи (вдруг все их открытые удалили).
-      const srcKeys = new Set(Object.keys(bySrc));
+      incoming.filter(t => t._src).forEach(t => { (bySrc[t._src] = bySrc[t._src] || []).push(t); });
+      // Все прошлые дни с открытыми задачами — пересчитываем их
       Object.keys(prev).forEach(key => {
         if (key >= today) return;
-        if ((prev[key].todos || []).some(t => !t.done)) srcKeys.add(key);
+        const prevOpen = (prev[key].todos || []).filter(t => !t.done);
+        if (prevOpen.length === 0 && !bySrc[key]) return;
+        const keptDone = (prev[key].todos || []).filter(t => t.done);
+        const edited = (bySrc[key] || []).map(({_src, ...t}) => t);
+        na[key] = {...prev[key], todos: [...keptDone, ...edited]};
       });
-
-      srcKeys.forEach(key => {
-        const stored = prev[key] || emptyDay();
-        const keptDone = (stored.todos || []).filter(t => t.done); // done остаются дома
-        const edited = (bySrc[key] || []).map(({_src, ...t}) => t); // открытые (возможно изменённые)
-        na[key] = {...stored, todos: [...keptDone, ...edited]};
-      });
-
       store.set("all-daily", na);
       setStreak(computeStreak(na, today));
       return na;
     });
   }, [today]);
-
-  // Одноразовая починка повреждённых данных: возвращает каждую задачу в её
-  // родной день (по id-времени создания). Запускается один раз после загрузки.
-  useEffect(() => {
-    if (migratedRef.current) return;
-    if (Object.keys(allDaily).length === 0) return;
-    migratedRef.current = true;
-    const normalized = normalizeStorage(allDaily);
-    if (JSON.stringify(normalized) !== JSON.stringify(allDaily)) {
-      setAllDaily(normalized);
-      store.set("all-daily", normalized);
-      setStreak(computeStreak(normalized, today));
-    }
-  }, [allDaily, today]);
 
   const tabs = [
     {id:"today",    icon:"◉", label:"Сегодня"},
