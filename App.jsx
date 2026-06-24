@@ -1054,33 +1054,49 @@ export default function App() {
 
   const saveCycle = useCallback(c => { setCycleData(c); store.set("cycle-data", c); }, []);
 
-  // Carryover: runs after allDaily loads, saves result to storage so it persists
+  // Carryover: each task lives in exactly ONE day.
+  //  - open tasks (never marked done in any day) -> moved to today
+  //  - done tasks -> kept in the day they were completed (latest such day)
+  // This prevents done-elsewhere copies from lingering and stops "resurrection".
   useEffect(() => {
     if (Object.keys(allDaily).length === 0) return;
     const todayDay = allDaily[today] || emptyDay();
-    if (todayDay.carryoverDate === today + "v2") return; // already done today
+    if (todayDay.carryoverDate === today + "v3") return; // already reconciled today
 
-    // IDs of tasks done in ANY day — these must never be re-carried
-    const doneEverIds = new Set();
-    Object.values(allDaily).forEach(day => {
-      (day.todos || []).forEach(t => { if (t.done) doneEverIds.add(t.id); });
-    });
-
-    const todayTodoIds = new Set((todayDay.todos || []).map(t => t.id));
-    const carried = [];
+    // Group every occurrence of a task id across all days
+    const byId = new Map();
     Object.entries(allDaily).forEach(([key, day]) => {
-      if (key >= today) return;
       (day.todos || []).forEach(t => {
-        if (!doneEverIds.has(t.id) && !todayTodoIds.has(t.id)) {
-          carried.push({...t, done: false});
-          todayTodoIds.add(t.id);
+        let e = byId.get(t.id);
+        if (!e) { e = {doneKey:null, doneTask:null, openTask:null}; byId.set(t.id, e); }
+        if (t.done) {
+          if (!e.doneKey || key > e.doneKey) { e.doneKey = key; e.doneTask = t; }
+        } else if (!e.openTask) {
+          e.openTask = t;
         }
       });
     });
-    // Remove previously mis-carried done tasks from today, then add correctly carried ones
-    const cleanTodayTodos = (todayDay.todos || []).filter(t => !doneEverIds.has(t.id) || t.done);
-    saveDayData(today, {...todayDay, carryoverDate: today + "v2", todos: [...carried, ...cleanTodayTodos]});
-  }, [allDaily, today, saveDayData]);
+
+    // Rebuild every day's todo list with one home per task
+    const newDays = {};
+    Object.keys(allDaily).forEach(key => { newDays[key] = {...allDaily[key], todos: []}; });
+    if (!newDays[today]) newDays[today] = {...emptyDay()};
+
+    byId.forEach(e => {
+      if (e.doneTask) {
+        if (!newDays[e.doneKey]) newDays[e.doneKey] = {...emptyDay()};
+        newDays[e.doneKey].todos.push({...e.doneTask, done:true});
+      } else {
+        newDays[today].todos.push({...e.openTask, done:false});
+      }
+    });
+
+    newDays[today] = {...newDays[today], carryoverDate: today + "v3"};
+
+    setAllDaily(newDays);
+    store.set("all-daily", newDays);
+    setStreak(computeStreak(newDays, today));
+  }, [allDaily, today]);
 
   const todayData = allDaily[today] || emptyDay();
 
