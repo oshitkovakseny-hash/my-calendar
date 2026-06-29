@@ -31,11 +31,42 @@ const store = {
     catch { return null; }
   },
   set(key, val) {
+    let ok = true;
     try { localStorage.setItem(key, JSON.stringify(val)); }
-    catch {}
+    catch (e) { ok = false; console.warn("localStorage write failed:", e); }
     fbSet(key, val);
+    return ok;
   },
 };
+
+// Сжимает изображение перед сохранением: уменьшает размер и пережимает в JPEG,
+// чтобы несколько фото помещались в хранилище (localStorage ~5 МБ, документ Firestore до 1 МБ).
+function compressImage(file, maxDim = 1024, quality = 0.72) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = ev => {
+      const img = new Image();
+      img.onload = () => {
+        let { width, height } = img;
+        if (width > maxDim || height > maxDim) {
+          const scale = maxDim / Math.max(width, height);
+          width = Math.round(width * scale);
+          height = Math.round(height * scale);
+        }
+        const canvas = document.createElement("canvas");
+        canvas.width = width; canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(img, 0, 0, width, height);
+        try { resolve(canvas.toDataURL("image/jpeg", quality)); }
+        catch (e) { reject(e); }
+      };
+      img.onerror = reject;
+      img.src = ev.target.result;
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
 
 const pad = n => String(n).padStart(2, "0");
 const toKey = d => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
@@ -841,7 +872,7 @@ function WishlistTab() {
   const [newWishName, setNewWishName] = useState("");
   const [expandedWish, setExpandedWish] = useState(null);
 
-  const saveWish = wl => { setWishlist(wl); store.set("wishlist", wl); };
+  const saveWish = wl => { setWishlist(wl); return store.set("wishlist", wl); };
 
   const addWish = () => {
     if (!newWishName.trim()) return;
@@ -854,11 +885,18 @@ function WishlistTab() {
   const pickPhoto = id => {
     const input = document.createElement("input");
     input.type = "file"; input.accept = "image/*";
-    input.onchange = e => {
+    input.onchange = async e => {
       const file = e.target.files[0]; if (!file) return;
-      const reader = new FileReader();
-      reader.onload = ev => updateWish(id, "photo", ev.target.result);
-      reader.readAsDataURL(file);
+      let dataUrl;
+      try { dataUrl = await compressImage(file); }
+      catch {
+        // если сжать не удалось — пробуем сохранить как есть
+        dataUrl = await new Promise(res => { const r = new FileReader(); r.onload = ev => res(ev.target.result); r.readAsDataURL(file); });
+      }
+      const ok = updateWish(id, "photo", dataUrl);
+      if (ok === false) {
+        alert("Не удалось сохранить фото: не хватает места в хранилище. Удалите несколько старых фото и попробуйте снова — остальные данные при этом сохранены.");
+      }
     };
     input.click();
   };
