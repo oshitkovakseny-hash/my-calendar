@@ -345,26 +345,36 @@ function CalendarTab({allDaily, cycleData, saveDayData, saveDayView, moveTask}) 
           <button onClick={()=>setCalMonth(new Date(calMonth.getFullYear(),calMonth.getMonth()+1))} style={{width:32,height:32,borderRadius:"50%",background:A.bg,border:"none",cursor:"pointer",fontSize:16,color:A.blue}}>›</button>
         </div>
       </div>
-      <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",padding:"12px 16px 4px"}}>
-        {DAYS_S.map(d=><div key={d} style={{textAlign:"center",fontSize:13,fontFamily:SF,fontWeight:600,color:A.label2}}>{d}</div>)}
+      <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",padding:"12px 10px 6px"}}>
+        {DAYS_S.map(d=><div key={d} style={{textAlign:"center",fontSize:12,fontFamily:SF,fontWeight:600,color:A.label2}}>{d}</div>)}
       </div>
-      <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",padding:"0 16px",gap:"2px 0"}}>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",margin:"0 10px",borderTop:`1px solid ${A.sep}`,borderLeft:`1px solid ${A.sep}`,borderRadius:4,overflow:"hidden"}}>
         {days.map((day,i)=>{
-          if (!day) return <div key={`e${i}`} style={{height:54}}/>;
-          const key=toKey(day), isToday=key===toKey(todayD), isSel=key===selKey;
+          const cellBorder={borderRight:`1px solid ${A.sep}`,borderBottom:`1px solid ${A.sep}`};
+          if (!day) return <div key={`e${i}`} style={{minHeight:96,background:"rgba(120,120,128,0.05)",...cellBorder}}/>;
+          const key=toKey(day), isToday=key===todayKey, isSel=key===selKey;
           const dd=allDaily[key], phase=getCyclePhase(day,cycleData);
-          const hasOpen=(dd?.todos||[]).some(t=>!t.done);
+          const todos=dd?.todos||[];
+          const shown=todos.slice(0,3), extra=todos.length-shown.length;
           return (
-            <button key={key} onClick={()=>setSelectedDay(day)} style={{height:54,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:3,background:"transparent",border:"none",cursor:"pointer"}}>
-              {phase?<div style={{width:20,height:3,borderRadius:2,background:phase.color,marginBottom:1}}/>:<div style={{height:4}}/>}
-              <div style={{width:32,height:32,borderRadius:"50%",display:"flex",alignItems:"center",justifyContent:"center",background:isToday?A.red:isSel?A.blue:"transparent"}}>
-                <span style={{fontSize:17,fontFamily:SF,fontWeight:isToday||isSel?700:400,letterSpacing:-0.41,color:isToday||isSel?"#fff":A.label}}>{day.getDate()}</span>
+            <button key={key} onClick={()=>setSelectedDay(day)} style={{minHeight:96,textAlign:"left",display:"flex",flexDirection:"column",gap:3,padding:"3px 3px 5px",background:isSel?A.blue+"12":"transparent",border:"none",...cellBorder,boxShadow:isSel?`inset 0 0 0 1.5px ${A.blue}`:"none",cursor:"pointer",overflow:"hidden"}}>
+              <div style={{display:"flex",alignItems:"center",gap:3,minHeight:20}}>
+                {phase&&<div title={phase.label} style={{width:5,height:5,borderRadius:"50%",background:phase.color,flexShrink:0}}/>}
+                {dd?.eating===true&&<div style={{width:5,height:5,borderRadius:"50%",background:A.green,flexShrink:0}}/>}
+                {dd?.eating===false&&<div style={{width:5,height:5,borderRadius:"50%",background:A.red,flexShrink:0}}/>}
+                {dd?.sport?.done&&<div style={{width:5,height:5,borderRadius:"50%",background:A.blue,flexShrink:0}}/>}
+                <div style={{marginLeft:"auto",width:20,height:20,borderRadius:"50%",display:"flex",alignItems:"center",justifyContent:"center",background:isToday?A.red:"transparent",flexShrink:0}}>
+                  <span style={{fontSize:12,fontFamily:SF,fontWeight:isToday?700:500,letterSpacing:-0.2,color:isToday?"#fff":A.label}}>{day.getDate()}</span>
+                </div>
               </div>
-              <div style={{display:"flex",gap:2,height:4}}>
-                {dd?.eating===true&&<div style={{width:4,height:4,borderRadius:"50%",background:A.green}}/>}
-                {dd?.eating===false&&<div style={{width:4,height:4,borderRadius:"50%",background:A.red}}/>}
-                {dd?.sport?.done&&<div style={{width:4,height:4,borderRadius:"50%",background:A.blue}}/>}
-                {hasOpen&&<div style={{width:4,height:4,borderRadius:"50%",background:A.orange}}/>}
+              <div style={{display:"flex",flexDirection:"column",gap:2,minWidth:0}}>
+                {shown.map(t=>{
+                  const tc=t.tag==="work"?A.blue:t.tag==="personal"?A.purple:A.label2;
+                  return (
+                    <div key={t.id} style={{fontSize:10,lineHeight:"13px",fontFamily:SF,color:t.done?A.label3:A.label,textDecoration:t.done?"line-through":"none",background:A.card,border:`1px solid ${A.sep}`,borderLeft:`2.5px solid ${t.done?A.label3:tc}`,borderRadius:4,padding:"1px 4px",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{t.text}</div>
+                  );
+                })}
+                {extra>0&&<div style={{fontSize:9.5,fontFamily:SF,color:A.label2,paddingLeft:4}}>+{extra} ещё</div>}
               </div>
             </button>
           );
