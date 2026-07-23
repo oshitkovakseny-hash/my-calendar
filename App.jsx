@@ -31,9 +31,11 @@ const store = {
     catch { return null; }
   },
   set(key, val) {
+    let ok = true;
     try { localStorage.setItem(key, JSON.stringify(val)); }
-    catch {}
+    catch (e) { ok = false; console.warn("localStorage write error:", e); }
     fbSet(key, val);
+    return ok;
   },
 };
 
@@ -94,14 +96,6 @@ function TagPill({tag, size=11}) {
 function IOSToggle({value,onChange}) {
   return <div onClick={()=>onChange(!value)} style={{width:51,height:31,borderRadius:16,background:value?A.green:"rgba(120,120,128,0.32)",position:"relative",cursor:"pointer",transition:"background .2s",flexShrink:0}}>
     <div style={{position:"absolute",top:2,left:value?22:2,width:27,height:27,borderRadius:"50%",background:"#fff",boxShadow:"0 3px 8px rgba(0,0,0,0.15)",transition:"left .2s"}}/>
-  </div>;
-}
-
-function SegmentedControl({options,value,onChange}) {
-  return <div style={{display:"flex",background:"rgba(118,118,128,0.12)",borderRadius:9,padding:2,gap:2}}>
-    {options.map(([v,l]) => (
-      <button key={v} onClick={()=>onChange(v)} style={{flex:1,padding:"6px 4px",borderRadius:7,border:"none",cursor:"pointer",fontFamily:SF,fontSize:13,fontWeight:value===v?600:400,background:value===v?"#fff":"transparent",color:A.label,boxShadow:value===v?"0 1px 3px rgba(0,0,0,0.08)":"none",transition:"all .15s"}}>{l}</button>
-    ))}
   </div>;
 }
 
@@ -209,67 +203,7 @@ function TaskList({dayData, onSave, currentKey, onMoveTask}) {
   );
 }
 
-function SportControl({dayData, onSave}) {
-  const setSport = (f,v) => onSave({...dayData, sport:{...(dayData.sport||{}), [f]:v}});
-  return <Card>
-    <div style={{display:"flex",alignItems:"center",padding:"12px 16px",borderBottom:dayData.sport?.done?`1px solid ${A.sep}`:"none",minHeight:44}}>
-      <div style={{width:28,height:28,borderRadius:6,background:A.blue,display:"flex",alignItems:"center",justifyContent:"center",marginRight:12,fontSize:15}}>🏃</div>
-      <span style={{flex:1,fontSize:17,fontFamily:SF,color:A.label,letterSpacing:-0.41}}>Тренировка</span>
-      <IOSToggle value={!!dayData.sport?.done} onChange={v=>setSport("done",v||null)}/>
-    </div>
-    {dayData.sport?.done && (
-      <div style={{padding:"10px 16px 12px 56px"}}>
-        <input value={dayData.sport?.type||""} onChange={e=>setSport("type",e.target.value)} placeholder="Зал, бег, йога, плавание..."
-          style={{width:"100%",border:"none",background:A.bg,borderRadius:8,padding:"8px 12px",fontSize:15,fontFamily:SF,color:A.label,boxSizing:"border-box",outline:"none"}}/>
-      </div>
-    )}
-  </Card>;
-}
-
-function EatingCard({dayData, onSave, allDaily, streak}) {
-  const r=36, circ=2*Math.PI*r, dash=Math.min(streak/30,1)*circ;
-  const sc = streak>=14?A.orange:streak>=7?A.blue:streak>=3?A.green:A.label3;
-  return (
-    <Card>
-      <div style={{padding:"16px 20px",display:"flex",alignItems:"center",gap:20}}>
-        <div style={{position:"relative",flexShrink:0}}>
-          <svg width={88} height={88} style={{transform:"rotate(-90deg)"}}>
-            <circle cx={44} cy={44} r={r} fill="none" stroke={A.bg} strokeWidth={8}/>
-            <circle cx={44} cy={44} r={r} fill="none" stroke={sc} strokeWidth={8} strokeDasharray={`${dash} ${circ}`} strokeLinecap="round" style={{transition:"stroke-dasharray .5s ease"}}/>
-          </svg>
-          <div style={{position:"absolute",inset:0,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center"}}>
-            <div style={{fontSize:28,fontWeight:700,fontFamily:SF,color:A.label,letterSpacing:-0.5}}>{streak}</div>
-            <div style={{fontSize:10,fontFamily:SF,color:A.label2,fontWeight:500,textTransform:"uppercase",letterSpacing:0.5}}>дней</div>
-          </div>
-        </div>
-        <div style={{flex:1}}>
-          <div style={{fontSize:17,fontWeight:600,fontFamily:SF,color:A.label,letterSpacing:-0.41}}>Дней в балансе</div>
-          <div style={{fontSize:13,fontFamily:SF,color:A.label2,marginTop:4,lineHeight:"18px"}}>
-            {streak===0?"Отметь сегодняшний день":streak<7?`${streak} день — хорошее начало!`:streak<14?`${streak} дней — так держать!`:`${streak} дней — впечатляет!`}
-          </div>
-          <div style={{display:"flex",gap:3,marginTop:10}}>
-            {Array.from({length:14}).map((_,i)=>{
-              const d=new Date(); d.setDate(d.getDate()-(13-i));
-              const s=allDaily[toKey(d)]?.eating;
-              return <div key={i} style={{flex:1,height:4,borderRadius:2,background:s===true?A.green:s===false?A.red:A.bg}}/>;
-            })}
-          </div>
-          <div style={{fontSize:11,fontFamily:SF,color:A.label3,marginTop:3}}>← 14 дней</div>
-        </div>
-      </div>
-      <div style={{borderTop:`1px solid ${A.sep}`,padding:"12px 16px"}}>
-        <div style={{fontSize:13,fontFamily:SF,color:A.label2,marginBottom:8,fontWeight:500}}>Как прошёл день?</div>
-        <SegmentedControl
-          options={[["ok","✓  В порядке"],["hard","Трудный день"]]}
-          value={dayData.eating===true?"ok":dayData.eating===false?"hard":null}
-          onChange={v=>onSave({...dayData,eating:v==="ok"?true:false})}
-        />
-      </div>
-    </Card>
-  );
-}
-
-function TodayTab({dayData, onSave, allDaily, streak, cycleData, today, moveTask}) {
+function TodayTab({dayData, onSave, cycleData, today, moveTask}) {
   const now = new Date(), phase = getCyclePhase(now, cycleData);
   return (
     <div style={{paddingBottom:100}}>
@@ -283,9 +217,7 @@ function TodayTab({dayData, onSave, allDaily, streak, cycleData, today, moveTask
           </div>
         )}
       </div>
-      <div style={{padding:"8px 16px 0"}}><SectionHeader>Питание</SectionHeader><EatingCard dayData={dayData} onSave={onSave} allDaily={allDaily} streak={streak}/></div>
-      <div style={{padding:"20px 16px 0"}}><SectionHeader>Спорт</SectionHeader><SportControl dayData={dayData} onSave={onSave}/></div>
-      <div style={{padding:"20px 16px 0"}}><TaskList dayData={dayData} onSave={onSave} currentKey={today} onMoveTask={moveTask}/></div>
+      <div style={{padding:"8px 16px 0"}}><TaskList dayData={dayData} onSave={onSave} currentKey={today} onMoveTask={moveTask}/></div>
       <div style={{padding:"20px 16px 0"}}>
         <SectionHeader>Заметки дня</SectionHeader>
         <Card>
@@ -297,20 +229,108 @@ function TodayTab({dayData, onSave, allDaily, streak, cycleData, today, moveTask
   );
 }
 
-function CalendarTab({allDaily, cycleData, saveDayData, saveDayView, moveTask}) {
-  const [calMonth, setCalMonth] = useState(new Date());
-  const [selectedDay, setSelectedDay] = useState(new Date());
-  const todayD = new Date();
-
-  const firstDay = new Date(calMonth.getFullYear(), calMonth.getMonth(), 1);
-  const lastDay  = new Date(calMonth.getFullYear(), calMonth.getMonth()+1, 0);
+function MonthGrid({year, month, allDaily, cycleData, todayKey, selKey, onSelect}) {
+  const firstDay = new Date(year, month, 1);
+  const lastDay  = new Date(year, month+1, 0);
   const startDow = (firstDay.getDay()+6) % 7;
   const days = [];
   for (let i=0; i<startDow; i++) days.push(null);
-  for (let i=1; i<=lastDay.getDate(); i++) days.push(new Date(calMonth.getFullYear(), calMonth.getMonth(), i));
+  for (let i=1; i<=lastDay.getDate(); i++) days.push(new Date(year, month, i));
+
+  return (
+    <div style={{marginBottom:22}}>
+      <div style={{padding:"0 20px 8px",fontSize:20,fontWeight:700,fontFamily:SF,color:A.label,letterSpacing:-0.4}}>
+        {MONTHS[month]} <span style={{color:A.label2}}>{year}</span>
+      </div>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",margin:"0 10px",borderTop:`1px solid ${A.sep}`,borderLeft:`1px solid ${A.sep}`,borderRadius:4,overflow:"hidden"}}>
+        {days.map((day,i)=>{
+          const cellBorder={borderRight:`1px solid ${A.sep}`,borderBottom:`1px solid ${A.sep}`};
+          if (!day) return <div key={`e${i}`} style={{minHeight:96,background:"rgba(120,120,128,0.05)",...cellBorder}}/>;
+          const key=toKey(day), isToday=key===todayKey, isSel=key===selKey;
+          const dd=allDaily[key], phase=getCyclePhase(day,cycleData);
+          const todos=dd?.todos||[];
+          const shown=todos.slice(0,3), extra=todos.length-shown.length;
+          return (
+            <button key={key} data-daykey={key} onClick={()=>onSelect(day)} style={{minHeight:96,textAlign:"left",display:"flex",flexDirection:"column",gap:3,padding:"3px 3px 5px",background:isSel?A.blue+"12":"transparent",border:"none",...cellBorder,boxShadow:isSel?`inset 0 0 0 1.5px ${A.blue}`:"none",cursor:"pointer",overflow:"hidden"}}>
+              <div style={{display:"flex",alignItems:"center",gap:3,minHeight:20}}>
+                {phase&&<div title={phase.label} style={{width:5,height:5,borderRadius:"50%",background:phase.color,flexShrink:0}}/>}
+                {dd?.eating===true&&<div style={{width:5,height:5,borderRadius:"50%",background:A.green,flexShrink:0}}/>}
+                {dd?.eating===false&&<div style={{width:5,height:5,borderRadius:"50%",background:A.red,flexShrink:0}}/>}
+                {dd?.sport?.done&&<div style={{width:5,height:5,borderRadius:"50%",background:A.blue,flexShrink:0}}/>}
+                <div style={{marginLeft:"auto",width:20,height:20,borderRadius:"50%",display:"flex",alignItems:"center",justifyContent:"center",background:isToday?A.red:"transparent",flexShrink:0}}>
+                  <span style={{fontSize:12,fontFamily:SF,fontWeight:isToday?700:500,letterSpacing:-0.2,color:isToday?"#fff":A.label}}>{day.getDate()}</span>
+                </div>
+              </div>
+              <div style={{display:"flex",flexDirection:"column",gap:2,minWidth:0}}>
+                {shown.map(t=>{
+                  const tc=t.tag==="work"?A.blue:t.tag==="personal"?A.purple:A.label2;
+                  return (
+                    <div key={t.id} style={{fontSize:10,lineHeight:"13px",fontFamily:SF,color:t.done?A.label3:A.label,textDecoration:t.done?"line-through":"none",background:A.card,border:`1px solid ${A.sep}`,borderLeft:`2.5px solid ${t.done?A.label3:tc}`,borderRadius:4,padding:"1px 4px",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{t.text}</div>
+                  );
+                })}
+                {extra>0&&<div style={{fontSize:9.5,fontFamily:SF,color:A.label2,paddingLeft:4}}>+{extra} ещё</div>}
+              </div>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+const CAL_MONTH_CAP = 240; // ~20 years each direction — effectively unlimited for personal use
+const CAL_MONTH_STEP = 6;
+
+function CalendarTab({allDaily, cycleData, saveDayData, saveDayView, moveTask}) {
+  const todayD = new Date();
+  const baseY = todayD.getFullYear(), baseM = todayD.getMonth();
+  const todayKey = toKey(todayD);
+
+  const [range, setRange] = useState({start:-3, end:3});
+  const [selectedDay, setSelectedDay] = useState(todayD);
+  const [jumpTick, setJumpTick] = useState(0);
+  const rootRef = useRef(null);
+  const topSentinelRef = useRef(null);
+  const bottomSentinelRef = useRef(null);
+
+  useEffect(() => {
+    const scrollEl = rootRef.current?.parentElement;
+    const topEl = topSentinelRef.current, bottomEl = bottomSentinelRef.current;
+    if (!scrollEl || !topEl || !bottomEl) return;
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (!entry.isIntersecting) return;
+        if (entry.target === topEl) {
+          setRange(r => r.start <= -CAL_MONTH_CAP ? r : {...r, start: Math.max(r.start - CAL_MONTH_STEP, -CAL_MONTH_CAP)});
+        } else if (entry.target === bottomEl) {
+          setRange(r => r.end >= CAL_MONTH_CAP ? r : {...r, end: Math.min(r.end + CAL_MONTH_STEP, CAL_MONTH_CAP)});
+        }
+      });
+    }, {root: scrollEl, rootMargin: "600px 0px 600px 0px"});
+    observer.observe(topEl);
+    observer.observe(bottomEl);
+    return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => {
+    if (jumpTick === 0) return;
+    const el = rootRef.current?.querySelector(`[data-daykey="${todayKey}"]`);
+    if (el) el.scrollIntoView({block:"center"});
+  }, [jumpTick]);
+
+  const goToToday = () => {
+    setRange({start:-3, end:3});
+    setSelectedDay(new Date());
+    setJumpTick(t => t+1);
+  };
+
+  const months = [];
+  for (let off = range.start; off <= range.end; off++) {
+    const d = new Date(baseY, baseM+off, 1);
+    months.push({y: d.getFullYear(), m: d.getMonth(), key: `${d.getFullYear()}-${d.getMonth()}`});
+  }
 
   const selKey = selectedDay ? toKey(selectedDay) : null;
-  const todayKey = toKey(todayD);
   const selPhase = selectedDay ? getCyclePhase(selectedDay, cycleData) : null;
   const isSelToday = selKey === todayKey;
 
@@ -336,55 +356,25 @@ function CalendarTab({allDaily, cycleData, saveDayData, saveDayView, moveTask}) 
   }
 
   return (
-    <div style={{paddingBottom:100}}>
-      <div style={{padding:"16px 20px 0",display:"flex",alignItems:"flex-end",justifyContent:"space-between"}}>
-        <LargeTitle>{MONTHS[calMonth.getMonth()]} <span style={{color:A.label2}}>{calMonth.getFullYear()}</span></LargeTitle>
-        <div style={{display:"flex",gap:8,paddingBottom:4}}>
-          <button onClick={()=>setCalMonth(new Date(calMonth.getFullYear(),calMonth.getMonth()-1))} style={{width:32,height:32,borderRadius:"50%",background:A.bg,border:"none",cursor:"pointer",fontSize:16,color:A.blue}}>‹</button>
-          <button onClick={()=>{setCalMonth(new Date());setSelectedDay(new Date());}} style={{height:32,padding:"0 12px",borderRadius:16,background:A.bg,border:"none",cursor:"pointer",fontSize:13,fontFamily:SF,fontWeight:600,color:A.blue}}>Сегодня</button>
-          <button onClick={()=>setCalMonth(new Date(calMonth.getFullYear(),calMonth.getMonth()+1))} style={{width:32,height:32,borderRadius:"50%",background:A.bg,border:"none",cursor:"pointer",fontSize:16,color:A.blue}}>›</button>
-        </div>
+    <div ref={rootRef} style={{paddingBottom:100}}>
+      <div style={{padding:"16px 20px 0",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+        <LargeTitle>Календарь</LargeTitle>
+        <button onClick={goToToday} style={{height:32,padding:"0 14px",borderRadius:16,background:A.bg,border:"none",cursor:"pointer",fontSize:13,fontFamily:SF,fontWeight:600,color:A.blue}}>Сегодня</button>
       </div>
-      <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",padding:"12px 10px 6px"}}>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",padding:"12px 10px 6px",position:"sticky",top:0,background:A.bg,zIndex:1}}>
         {DAYS_S.map(d=><div key={d} style={{textAlign:"center",fontSize:12,fontFamily:SF,fontWeight:600,color:A.label2}}>{d}</div>)}
       </div>
-      <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",margin:"0 10px",borderTop:`1px solid ${A.sep}`,borderLeft:`1px solid ${A.sep}`,borderRadius:4,overflow:"hidden"}}>
-        {days.map((day,i)=>{
-          const cellBorder={borderRight:`1px solid ${A.sep}`,borderBottom:`1px solid ${A.sep}`};
-          if (!day) return <div key={`e${i}`} style={{minHeight:96,background:"rgba(120,120,128,0.05)",...cellBorder}}/>;
-          const key=toKey(day), isToday=key===todayKey, isSel=key===selKey;
-          const dd=allDaily[key], phase=getCyclePhase(day,cycleData);
-          const todos=dd?.todos||[];
-          const shown=todos.slice(0,3), extra=todos.length-shown.length;
-          return (
-            <button key={key} onClick={()=>setSelectedDay(day)} style={{minHeight:96,textAlign:"left",display:"flex",flexDirection:"column",gap:3,padding:"3px 3px 5px",background:isSel?A.blue+"12":"transparent",border:"none",...cellBorder,boxShadow:isSel?`inset 0 0 0 1.5px ${A.blue}`:"none",cursor:"pointer",overflow:"hidden"}}>
-              <div style={{display:"flex",alignItems:"center",gap:3,minHeight:20}}>
-                {phase&&<div title={phase.label} style={{width:5,height:5,borderRadius:"50%",background:phase.color,flexShrink:0}}/>}
-                {dd?.eating===true&&<div style={{width:5,height:5,borderRadius:"50%",background:A.green,flexShrink:0}}/>}
-                {dd?.eating===false&&<div style={{width:5,height:5,borderRadius:"50%",background:A.red,flexShrink:0}}/>}
-                {dd?.sport?.done&&<div style={{width:5,height:5,borderRadius:"50%",background:A.blue,flexShrink:0}}/>}
-                <div style={{marginLeft:"auto",width:20,height:20,borderRadius:"50%",display:"flex",alignItems:"center",justifyContent:"center",background:isToday?A.red:"transparent",flexShrink:0}}>
-                  <span style={{fontSize:12,fontFamily:SF,fontWeight:isToday?700:500,letterSpacing:-0.2,color:isToday?"#fff":A.label}}>{day.getDate()}</span>
-                </div>
-              </div>
-              <div style={{display:"flex",flexDirection:"column",gap:2,minWidth:0}}>
-                {shown.map(t=>{
-                  const tc=t.tag==="work"?A.blue:t.tag==="personal"?A.purple:A.label2;
-                  return (
-                    <div key={t.id} style={{fontSize:10,lineHeight:"13px",fontFamily:SF,color:t.done?A.label3:A.label,textDecoration:t.done?"line-through":"none",background:A.card,border:`1px solid ${A.sep}`,borderLeft:`2.5px solid ${t.done?A.label3:tc}`,borderRadius:4,padding:"1px 4px",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{t.text}</div>
-                  );
-                })}
-                {extra>0&&<div style={{fontSize:9.5,fontFamily:SF,color:A.label2,paddingLeft:4}}>+{extra} ещё</div>}
-              </div>
-            </button>
-          );
-        })}
-      </div>
+
+      <div ref={topSentinelRef} style={{height:1}}/>
+      {months.map(mo => (
+        <MonthGrid key={mo.key} year={mo.y} month={mo.m} allDaily={allDaily} cycleData={cycleData} todayKey={todayKey} selKey={selKey} onSelect={setSelectedDay}/>
+      ))}
+      <div ref={bottomSentinelRef} style={{height:1}}/>
 
       {selectedDay && (
         <div style={{marginTop:8}}>
           <div style={{padding:"12px 20px 4px",display:"flex",alignItems:"baseline",justifyContent:"space-between"}}>
-            <div style={{fontSize:22,fontWeight:700,fontFamily:SF,color:A.label,letterSpacing:-0.4}}>{isSelToday?"Сегодня":`${selectedDay.getDate()} ${MONTHS_G[selectedDay.getMonth()]}`}</div>
+            <div style={{fontSize:22,fontWeight:700,fontFamily:SF,color:A.label,letterSpacing:-0.4}}>{isSelToday?"Сегодня":`${selectedDay.getDate()} ${MONTHS_G[selectedDay.getMonth()]} ${selectedDay.getFullYear()}`}</div>
             {selPhase&&<span style={{fontSize:13,fontFamily:SF,fontWeight:500,color:selPhase.color}}>{selPhase.label} · день {selPhase.day}</span>}
           </div>
           <div style={{padding:"8px 16px 0"}}><TaskList dayData={selData} onSave={selKey<=todayKey ? d=>saveDayView(selKey,d) : d=>saveDayData(selKey,d)} currentKey={selKey} onMoveTask={moveTask}/></div>
@@ -846,12 +836,41 @@ function buildUnifiedReportHTML(daysInRange, allDaily, cycleData, from, to, fmt,
     </body></html>`;
 }
 
+function compressImage(file, maxDim = 1280, quality = 0.75) {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      let { width, height } = img;
+      if (width > maxDim || height > maxDim) {
+        if (width > height) { height = Math.round(height * maxDim / width); width = maxDim; }
+        else { width = Math.round(width * maxDim / height); height = maxDim; }
+      }
+      const canvas = document.createElement("canvas");
+      canvas.width = width; canvas.height = height;
+      const ctx = canvas.getContext("2d");
+      ctx.fillStyle = "#fff";
+      ctx.fillRect(0, 0, width, height);
+      ctx.drawImage(img, 0, 0, width, height);
+      resolve(canvas.toDataURL("image/jpeg", quality));
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("image decode failed")); };
+    img.src = url;
+  });
+}
+
 function WishlistTab() {
   const [wishlist, setWishlist] = useState(() => store.get("wishlist") || []);
   const [newWishName, setNewWishName] = useState("");
   const [expandedWish, setExpandedWish] = useState(null);
+  const [uploadingId, setUploadingId] = useState(null);
 
-  const saveWish = wl => { setWishlist(wl); store.set("wishlist", wl); };
+  const saveWish = wl => {
+    setWishlist(wl);
+    const ok = store.set("wishlist", wl);
+    if (!ok) alert("Не удалось сохранить: недостаточно места в хранилище браузера. Попробуйте выбрать фото меньшего размера.");
+  };
 
   const addWish = () => {
     if (!newWishName.trim()) return;
@@ -866,9 +885,11 @@ function WishlistTab() {
     input.type = "file"; input.accept = "image/*";
     input.onchange = e => {
       const file = e.target.files[0]; if (!file) return;
-      const reader = new FileReader();
-      reader.onload = ev => updateWish(id, "photo", ev.target.result);
-      reader.readAsDataURL(file);
+      setUploadingId(id);
+      compressImage(file)
+        .then(dataUrl => updateWish(id, "photo", dataUrl))
+        .catch(() => alert("Не удалось обработать фото. Попробуйте другое изображение."))
+        .finally(() => setUploadingId(null));
     };
     input.click();
   };
@@ -924,8 +945,8 @@ function WishlistTab() {
                       <div style={{fontSize:12,color:A.label2,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:6}}>Фото</div>
                       {w.photo && <img src={w.photo} alt="" style={{width:"100%",maxHeight:200,borderRadius:10,objectFit:"cover",marginBottom:8,display:"block"}}/>}
                       <div style={{display:"flex",gap:8,marginBottom:10}}>
-                        <button onClick={()=>pickPhoto(w.id)} style={{flex:1,padding:"10px",borderRadius:10,border:`1px solid ${A.blue}`,background:A.blue+"11",color:A.blue,fontSize:15,fontFamily:SF,fontWeight:500,cursor:"pointer"}}>
-                          📷 Загрузить с устройства
+                        <button onClick={()=>pickPhoto(w.id)} disabled={uploadingId===w.id} style={{flex:1,padding:"10px",borderRadius:10,border:`1px solid ${A.blue}`,background:A.blue+"11",color:A.blue,fontSize:15,fontFamily:SF,fontWeight:500,cursor:uploadingId===w.id?"default":"pointer",opacity:uploadingId===w.id?0.6:1}}>
+                          {uploadingId===w.id ? "Загрузка..." : "📷 Загрузить с устройства"}
                         </button>
                         {w.photo && <button onClick={()=>updateWish(w.id,"photo","")} style={{padding:"10px 12px",borderRadius:10,border:`1px solid ${A.sep}`,background:A.card,color:A.red,fontSize:13,fontFamily:SF,cursor:"pointer"}}>Удалить фото</button>}
                       </div>
@@ -1224,7 +1245,7 @@ export default function App() {
       <div style={{background:A.bg,height:"100dvh",maxWidth:430,margin:"0 auto",fontFamily:SF,display:"flex",flexDirection:"column"}}>
         {syncBar}
         <div style={{flex:1,overflowY:"auto",paddingBottom:84}}>
-          {tab==="today"    && <TodayTab    dayData={todayData} onSave={saveToday} allDaily={allDaily} streak={streak} cycleData={cycleData} today={today} moveTask={moveTask}/>}
+          {tab==="today"    && <TodayTab    dayData={todayData} onSave={saveToday} cycleData={cycleData} today={today} moveTask={moveTask}/>}
           {tab==="calendar" && <CalendarTab allDaily={allDaily} cycleData={cycleData} saveDayData={saveDayData} saveDayView={saveDayView} moveTask={moveTask}/>}
           {tab==="settings" && <SettingsTab cycleData={cycleData} saveCycle={saveCycle} allDaily={allDaily} streak={streak}/>}
           {tab==="finance"  && <FinanceTab/>}
