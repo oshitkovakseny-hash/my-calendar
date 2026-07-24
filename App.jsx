@@ -78,6 +78,27 @@ function computeStreak(allD, todayStr) {
 
 const emptyDay = () => ({ todos:[], notes:"", eating:null, sport:{done:null,type:""} });
 
+const WIDE_QUERY = "(min-width: 900px)";
+function useIsWide() {
+  const [isWide, setIsWide] = useState(() => typeof window !== "undefined" && window.matchMedia(WIDE_QUERY).matches);
+  useEffect(() => {
+    const mql = window.matchMedia(WIDE_QUERY);
+    const handler = e => setIsWide(e.matches);
+    mql.addEventListener("change", handler);
+    return () => mql.removeEventListener("change", handler);
+  }, []);
+  return isWide;
+}
+
+function getScrollParent(el) {
+  let node = el?.parentElement;
+  while (node) {
+    if (/(auto|scroll)/.test(getComputedStyle(node).overflowY)) return node;
+    node = node.parentElement;
+  }
+  return document.scrollingElement || document.documentElement;
+}
+
 
 const LargeTitle = ({children,style={}}) => <div style={{fontSize:34,fontWeight:700,letterSpacing:0.37,lineHeight:"41px",fontFamily:SF,color:A.label,...style}}>{children}</div>;
 const SectionHeader = ({children,style={}}) => <div style={{fontSize:13,fontWeight:400,color:A.label2,letterSpacing:-0.08,fontFamily:SF,padding:"0 16px 6px 20px",textTransform:"uppercase",...style}}>{children}</div>;
@@ -203,11 +224,27 @@ function TaskList({dayData, onSave, currentKey, onMoveTask}) {
   );
 }
 
-function TodayTab({dayData, onSave, cycleData, today, moveTask}) {
+function TodayTab({dayData, onSave, cycleData, today, moveTask, isWide}) {
   const now = new Date(), phase = getCyclePhase(now, cycleData);
+
+  const tasksBlock = (
+    <div style={isWide ? {} : {padding:"8px 16px 0"}}>
+      <TaskList dayData={dayData} onSave={onSave} currentKey={today} onMoveTask={moveTask}/>
+    </div>
+  );
+  const notesBlock = (
+    <div style={isWide ? {} : {padding:"20px 16px 0"}}>
+      <SectionHeader>Заметки дня</SectionHeader>
+      <Card>
+        <textarea value={dayData.notes||""} onChange={e=>onSave({...dayData,notes:e.target.value})} placeholder="Мысли, идеи, наблюдения..." rows={isWide?16:4}
+          style={{width:"100%",border:"none",background:"transparent",padding:"12px 16px",fontSize:17,fontFamily:SF,color:A.label,resize:"none",boxSizing:"border-box",letterSpacing:-0.41,lineHeight:"22px",outline:"none"}}/>
+      </Card>
+    </div>
+  );
+
   return (
-    <div style={{paddingBottom:100}}>
-      <div style={{padding:"16px 20px 8px"}}>
+    <div style={{paddingBottom: isWide ? 40 : 100}}>
+      <div style={{padding: isWide ? "20px 0 16px" : "16px 20px 8px"}}>
         <div style={{fontSize:13,fontFamily:SF,color:A.label2,letterSpacing:-0.08}}>{WEEKDAYS[now.getDay()]}, {now.getDate()} {MONTHS_G[now.getMonth()]}</div>
         <LargeTitle style={{marginTop:2}}>Сегодня</LargeTitle>
         {phase && (
@@ -217,41 +254,43 @@ function TodayTab({dayData, onSave, cycleData, today, moveTask}) {
           </div>
         )}
       </div>
-      <div style={{padding:"8px 16px 0"}}><TaskList dayData={dayData} onSave={onSave} currentKey={today} onMoveTask={moveTask}/></div>
-      <div style={{padding:"20px 16px 0"}}>
-        <SectionHeader>Заметки дня</SectionHeader>
-        <Card>
-          <textarea value={dayData.notes||""} onChange={e=>onSave({...dayData,notes:e.target.value})} placeholder="Мысли, идеи, наблюдения..." rows={4}
-            style={{width:"100%",border:"none",background:"transparent",padding:"12px 16px",fontSize:17,fontFamily:SF,color:A.label,resize:"none",boxSizing:"border-box",letterSpacing:-0.41,lineHeight:"22px",outline:"none"}}/>
-        </Card>
-      </div>
+      {isWide ? (
+        <div style={{display:"flex",gap:24,alignItems:"flex-start"}}>
+          <div style={{flex:"1.3 1 0",minWidth:0}}>{tasksBlock}</div>
+          <div style={{flex:"1 1 0",minWidth:0}}>{notesBlock}</div>
+        </div>
+      ) : (
+        <>{tasksBlock}{notesBlock}</>
+      )}
     </div>
   );
 }
 
-function MonthGrid({year, month, allDaily, cycleData, todayKey, selKey, onSelect}) {
+function MonthGrid({year, month, allDaily, cycleData, todayKey, selKey, onSelect, isWide}) {
   const firstDay = new Date(year, month, 1);
   const lastDay  = new Date(year, month+1, 0);
   const startDow = (firstDay.getDay()+6) % 7;
   const days = [];
   for (let i=0; i<startDow; i++) days.push(null);
   for (let i=1; i<=lastDay.getDate(); i++) days.push(new Date(year, month, i));
+  const cellMinHeight = isWide ? 132 : 96;
+  const shownLimit = isWide ? 5 : 3;
 
   return (
     <div style={{marginBottom:22}}>
-      <div style={{padding:"0 20px 8px",fontSize:20,fontWeight:700,fontFamily:SF,color:A.label,letterSpacing:-0.4}}>
+      <div style={{padding: isWide ? "0 0 8px" : "0 20px 8px", fontSize:20,fontWeight:700,fontFamily:SF,color:A.label,letterSpacing:-0.4}}>
         {MONTHS[month]} <span style={{color:A.label2}}>{year}</span>
       </div>
-      <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",margin:"0 10px",borderTop:`1px solid ${A.sep}`,borderLeft:`1px solid ${A.sep}`,borderRadius:4,overflow:"hidden"}}>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",margin: isWide ? 0 : "0 10px",borderTop:`1px solid ${A.sep}`,borderLeft:`1px solid ${A.sep}`,borderRadius:4,overflow:"hidden"}}>
         {days.map((day,i)=>{
           const cellBorder={borderRight:`1px solid ${A.sep}`,borderBottom:`1px solid ${A.sep}`};
-          if (!day) return <div key={`e${i}`} style={{minHeight:96,background:"rgba(120,120,128,0.05)",...cellBorder}}/>;
+          if (!day) return <div key={`e${i}`} style={{minHeight:cellMinHeight,background:"rgba(120,120,128,0.05)",...cellBorder}}/>;
           const key=toKey(day), isToday=key===todayKey, isSel=key===selKey;
           const dd=allDaily[key], phase=getCyclePhase(day,cycleData);
           const todos=dd?.todos||[];
-          const shown=todos.slice(0,3), extra=todos.length-shown.length;
+          const shown=todos.slice(0,shownLimit), extra=todos.length-shown.length;
           return (
-            <button key={key} data-daykey={key} onClick={()=>onSelect(day)} style={{minHeight:96,textAlign:"left",display:"flex",flexDirection:"column",gap:3,padding:"3px 3px 5px",background:isSel?A.blue+"12":"transparent",border:"none",...cellBorder,boxShadow:isSel?`inset 0 0 0 1.5px ${A.blue}`:"none",cursor:"pointer",overflow:"hidden"}}>
+            <button key={key} data-daykey={key} onClick={()=>onSelect(day)} style={{minHeight:cellMinHeight,textAlign:"left",display:"flex",flexDirection:"column",gap:3,padding:"3px 3px 5px",background:isSel?A.blue+"12":"transparent",border:"none",...cellBorder,boxShadow:isSel?`inset 0 0 0 1.5px ${A.blue}`:"none",cursor:"pointer",overflow:"hidden"}}>
               <div style={{display:"flex",alignItems:"center",gap:3,minHeight:20}}>
                 {phase&&<div title={phase.label} style={{width:5,height:5,borderRadius:"50%",background:phase.color,flexShrink:0}}/>}
                 {dd?.eating===true&&<div style={{width:5,height:5,borderRadius:"50%",background:A.green,flexShrink:0}}/>}
@@ -281,7 +320,7 @@ function MonthGrid({year, month, allDaily, cycleData, todayKey, selKey, onSelect
 const CAL_MONTH_CAP = 240; // ~20 years each direction — effectively unlimited for personal use
 const CAL_MONTH_STEP = 6;
 
-function CalendarTab({allDaily, cycleData, saveDayData, saveDayView, moveTask}) {
+function CalendarTab({allDaily, cycleData, saveDayData, saveDayView, moveTask, isWide}) {
   const todayD = new Date();
   const baseY = todayD.getFullYear(), baseM = todayD.getMonth();
   const todayKey = toKey(todayD);
@@ -294,7 +333,7 @@ function CalendarTab({allDaily, cycleData, saveDayData, saveDayView, moveTask}) 
   const bottomSentinelRef = useRef(null);
 
   useEffect(() => {
-    const scrollEl = rootRef.current?.parentElement;
+    const scrollEl = getScrollParent(rootRef.current);
     const topEl = topSentinelRef.current, bottomEl = bottomSentinelRef.current;
     if (!scrollEl || !topEl || !bottomEl) return;
     const observer = new IntersectionObserver((entries) => {
@@ -355,30 +394,47 @@ function CalendarTab({allDaily, cycleData, saveDayData, saveDayView, moveTask}) 
     selData = realSel;
   }
 
+  const weekdayHeader = (
+    <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",padding: isWide ? "0 0 6px" : "12px 10px 6px",position:"sticky",top:0,background:A.bg,zIndex:1}}>
+      {DAYS_S.map(d=><div key={d} style={{textAlign:"center",fontSize:12,fontFamily:SF,fontWeight:600,color:A.label2}}>{d}</div>)}
+    </div>
+  );
+
+  const monthList = (
+    <>
+      {weekdayHeader}
+      <div ref={topSentinelRef} style={{height:1}}/>
+      {months.map(mo => (
+        <MonthGrid key={mo.key} year={mo.y} month={mo.m} allDaily={allDaily} cycleData={cycleData} todayKey={todayKey} selKey={selKey} onSelect={setSelectedDay} isWide={isWide}/>
+      ))}
+      <div ref={bottomSentinelRef} style={{height:1}}/>
+    </>
+  );
+
+  const detailPanel = selectedDay && (
+    <div style={isWide ? {} : {marginTop:8}}>
+      <div style={{padding: isWide ? "0 0 4px" : "12px 20px 4px",display:"flex",alignItems:"baseline",justifyContent:"space-between"}}>
+        <div style={{fontSize:22,fontWeight:700,fontFamily:SF,color:A.label,letterSpacing:-0.4}}>{isSelToday?"Сегодня":`${selectedDay.getDate()} ${MONTHS_G[selectedDay.getMonth()]} ${selectedDay.getFullYear()}`}</div>
+        {selPhase&&<span style={{fontSize:13,fontFamily:SF,fontWeight:500,color:selPhase.color}}>{selPhase.label} · день {selPhase.day}</span>}
+      </div>
+      <div style={{padding: isWide ? "8px 0 0" : "8px 16px 0"}}><TaskList dayData={selData} onSave={selKey<=todayKey ? d=>saveDayView(selKey,d) : d=>saveDayData(selKey,d)} currentKey={selKey} onMoveTask={moveTask}/></div>
+    </div>
+  );
+
   return (
-    <div ref={rootRef} style={{paddingBottom:100}}>
-      <div style={{padding:"16px 20px 0",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+    <div ref={rootRef} style={{paddingBottom: isWide ? 40 : 100}}>
+      <div style={{padding: isWide ? "20px 0 0" : "16px 20px 0",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
         <LargeTitle>Календарь</LargeTitle>
         <button onClick={goToToday} style={{height:32,padding:"0 14px",borderRadius:16,background:A.bg,border:"none",cursor:"pointer",fontSize:13,fontFamily:SF,fontWeight:600,color:A.blue}}>Сегодня</button>
       </div>
-      <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",padding:"12px 10px 6px",position:"sticky",top:0,background:A.bg,zIndex:1}}>
-        {DAYS_S.map(d=><div key={d} style={{textAlign:"center",fontSize:12,fontFamily:SF,fontWeight:600,color:A.label2}}>{d}</div>)}
-      </div>
 
-      <div ref={topSentinelRef} style={{height:1}}/>
-      {months.map(mo => (
-        <MonthGrid key={mo.key} year={mo.y} month={mo.m} allDaily={allDaily} cycleData={cycleData} todayKey={todayKey} selKey={selKey} onSelect={setSelectedDay}/>
-      ))}
-      <div ref={bottomSentinelRef} style={{height:1}}/>
-
-      {selectedDay && (
-        <div style={{marginTop:8}}>
-          <div style={{padding:"12px 20px 4px",display:"flex",alignItems:"baseline",justifyContent:"space-between"}}>
-            <div style={{fontSize:22,fontWeight:700,fontFamily:SF,color:A.label,letterSpacing:-0.4}}>{isSelToday?"Сегодня":`${selectedDay.getDate()} ${MONTHS_G[selectedDay.getMonth()]} ${selectedDay.getFullYear()}`}</div>
-            {selPhase&&<span style={{fontSize:13,fontFamily:SF,fontWeight:500,color:selPhase.color}}>{selPhase.label} · день {selPhase.day}</span>}
-          </div>
-          <div style={{padding:"8px 16px 0"}}><TaskList dayData={selData} onSave={selKey<=todayKey ? d=>saveDayView(selKey,d) : d=>saveDayData(selKey,d)} currentKey={selKey} onMoveTask={moveTask}/></div>
+      {isWide ? (
+        <div style={{display:"flex",gap:28,alignItems:"flex-start",marginTop:16}}>
+          <div style={{flex:1,minWidth:0}}>{monthList}</div>
+          <div style={{width:380,flexShrink:0,position:"sticky",top:0,maxHeight:"calc(100dvh - 24px)",overflowY:"auto"}}>{detailPanel}</div>
         </div>
+      ) : (
+        <>{monthList}{detailPanel}</>
       )}
     </div>
   );
@@ -613,7 +669,7 @@ function AddRow({onAdd, placeholderName="Название", placeholderAmt="Су
   );
 }
 
-function FinanceTab() {
+function FinanceTab({isWide}) {
   const now = new Date();
   const [month, setMonth] = useState({y:now.getFullYear(), m:now.getMonth()});
   const monthKey = `finances-${month.y}-${pad(month.m+1)}`;
@@ -654,86 +710,103 @@ function FinanceTab() {
   const fmtMoney = n => Number(n||0).toLocaleString("ru-RU");
 
   const rowStyle = {display:"flex",alignItems:"center",padding:"12px 16px",borderBottom:`1px solid ${A.sep}`,minHeight:46};
+  const sidePad = isWide ? 0 : 16;
+
+  const incomeBlock = (
+    <div style={{padding:`0 ${sidePad}px 0`}}>
+      <SectionHeader>Доходы за месяц</SectionHeader>
+      <Card>
+        <div style={{display:"flex",alignItems:"center",padding:"12px 16px",gap:12}}>
+          <input value={monthData.income||""} onChange={e=>saveMD({...monthData,income:e.target.value})}
+            placeholder="0" inputMode="decimal"
+            style={{flex:1,border:`1px solid ${A.sep}`,background:A.bg,borderRadius:10,padding:"10px 12px",fontSize:20,fontFamily:SF,fontWeight:600,color:A.label,outline:"none",letterSpacing:-0.5}}/>
+          <span style={{fontSize:15,fontFamily:SF,color:A.label2,whiteSpace:"nowrap"}}>₽</span>
+        </div>
+      </Card>
+    </div>
+  );
+
+  const fixedBlock = (
+    <div style={{padding:`20px ${sidePad}px 0`}}>
+      <div style={{display:"flex",alignItems:"center",padding:"0 4px 6px 20px",cursor:"pointer"}} onClick={()=>setFixedOpen(o=>!o)}>
+        <span style={{flex:1,fontSize:13,fontWeight:400,color:A.label2,letterSpacing:-0.08,textTransform:"uppercase"}}>Постоянные расходы · {fmtMoney(fixedTotal)} ₽</span>
+        <span style={{fontSize:18,color:A.label2,transform:fixedOpen?"rotate(90deg)":"none",transition:"transform .15s",marginRight:4}}>›</span>
+      </div>
+      {fixedOpen && <Card>
+        {fixedExpenses.length === 0 && <div style={{padding:"14px 16px",color:A.label2,fontSize:15,fontFamily:SF,textAlign:"center"}}>Нет постоянных расходов</div>}
+        {fixedExpenses.map((e,i)=>(
+          <div key={e.id} style={{...rowStyle,borderBottom:i<fixedExpenses.length-1?`1px solid ${A.sep}`:"none"}}>
+            <span style={{flex:1,fontSize:17,fontFamily:SF,color:A.label}}>{e.name}</span>
+            <span style={{fontSize:15,fontFamily:SF,color:A.label2,marginRight:16}}>{fmtMoney(e.amount)} ₽</span>
+            <button onClick={()=>delFixed(e.id)} style={{width:28,height:28,borderRadius:"50%",background:A.red+"20",border:"none",cursor:"pointer",color:A.red,fontSize:16,fontWeight:700,display:"flex",alignItems:"center",justifyContent:"center"}}>×</button>
+          </div>
+        ))}
+        <AddRow onAdd={addFixed} placeholderName="Аренда, свет, байк..." placeholderAmt="Сумма ₽" hasBorder={fixedExpenses.length>0}/>
+      </Card>}
+    </div>
+  );
+
+  const varBlock = (
+    <div style={{padding:`20px ${sidePad}px 0`}}>
+      <SectionHeader>Расходы · {MONTHS_G[month.m]}</SectionHeader>
+      <Card>
+        {(monthData.expenses||[]).length === 0 && <div style={{padding:"14px 16px",color:A.label2,fontSize:15,fontFamily:SF,textAlign:"center"}}>Расходов нет</div>}
+        {(monthData.expenses||[]).map((e,i,arr)=>(
+          <div key={e.id} style={{...rowStyle,borderBottom:i<arr.length-1?`1px solid ${A.sep}`:"none"}}>
+            <div style={{flex:1}}>
+              <div style={{fontSize:17,fontFamily:SF,color:A.label}}>{e.name}</div>
+              {e.date && <div style={{fontSize:12,fontFamily:SF,color:A.label2,marginTop:2}}>{e.date}</div>}
+            </div>
+            <span style={{fontSize:15,fontFamily:SF,color:A.label2,marginRight:16}}>{fmtMoney(e.amount)} ₽</span>
+            <button onClick={()=>delExp(e.id)} style={{width:28,height:28,borderRadius:"50%",background:A.red+"20",border:"none",cursor:"pointer",color:A.red,fontSize:16,fontWeight:700,display:"flex",alignItems:"center",justifyContent:"center"}}>×</button>
+          </div>
+        ))}
+        <AddRow onAdd={addExp} placeholderName="Продукты, кафе, такси..." placeholderAmt="Сумма ₽" hasBorder={(monthData.expenses||[]).length>0}/>
+      </Card>
+    </div>
+  );
+
+  const totalsBlock = (
+    <div style={{padding:`20px ${sidePad}px 0`}}>
+      <SectionHeader>Итого</SectionHeader>
+      <Card>
+        {[
+          ["Доходы", fmtMoney(income)+" ₽", A.green],
+          ["Постоянные расходы", fmtMoney(fixedTotal)+" ₽", A.label],
+          ["Переменные расходы", fmtMoney(varTotal)+" ₽", A.label],
+          ["Всего потрачено", fmtMoney(totalSpent)+" ₽", A.red],
+        ].map(([label,val,color],i)=>(
+          <div key={label} style={{display:"flex",alignItems:"center",padding:"11px 16px",borderBottom:`1px solid ${A.sep}`}}>
+            <span style={{flex:1,fontSize:15,fontFamily:SF,color:A.label}}>{label}</span>
+            <span style={{fontSize:15,fontFamily:SF,color}}>{val}</span>
+          </div>
+        ))}
+        <div style={{display:"flex",alignItems:"center",padding:"14px 16px"}}>
+          <span style={{flex:1,fontSize:17,fontFamily:SF,fontWeight:600,color:A.label}}>Остаток</span>
+          <span style={{fontSize:20,fontFamily:SF,fontWeight:700,color:balance>=0?A.green:A.red}}>{balance>=0?"+":""}{fmtMoney(balance)} ₽</span>
+        </div>
+      </Card>
+    </div>
+  );
 
   return (
-    <div style={{paddingBottom:100}}>
-      <div style={{padding:"16px 20px 8px"}}><LargeTitle>Финансы</LargeTitle></div>
+    <div style={{paddingBottom: isWide ? 40 : 100}}>
+      <div style={{padding: isWide ? "20px 0 8px" : "16px 20px 8px"}}><LargeTitle>Финансы</LargeTitle></div>
 
-      <div style={{display:"flex",alignItems:"center",gap:8,padding:"0 20px 12px"}}>
+      <div style={{display:"flex",alignItems:"center",gap:8,padding: isWide ? "0 0 12px" : "0 20px 12px"}}>
         <button onClick={prevMonth} style={{width:36,height:36,borderRadius:"50%",background:A.bg,border:"none",cursor:"pointer",fontSize:18,color:A.blue,display:"flex",alignItems:"center",justifyContent:"center"}}>‹</button>
         <span style={{flex:1,textAlign:"center",fontSize:17,fontFamily:SF,fontWeight:600,color:A.label}}>{MONTHS[month.m]} {month.y}</span>
         <button onClick={nextMonth} style={{width:36,height:36,borderRadius:"50%",background:A.bg,border:"none",cursor:"pointer",fontSize:18,color:A.blue,display:"flex",alignItems:"center",justifyContent:"center"}}>›</button>
       </div>
 
-      <div style={{padding:"0 16px 0"}}>
-        <SectionHeader>Доходы за месяц</SectionHeader>
-        <Card>
-          <div style={{display:"flex",alignItems:"center",padding:"12px 16px",gap:12}}>
-            <input value={monthData.income||""} onChange={e=>saveMD({...monthData,income:e.target.value})}
-              placeholder="0" inputMode="decimal"
-              style={{flex:1,border:`1px solid ${A.sep}`,background:A.bg,borderRadius:10,padding:"10px 12px",fontSize:20,fontFamily:SF,fontWeight:600,color:A.label,outline:"none",letterSpacing:-0.5}}/>
-            <span style={{fontSize:15,fontFamily:SF,color:A.label2,whiteSpace:"nowrap"}}>₽</span>
-          </div>
-        </Card>
-      </div>
-
-      <div style={{padding:"20px 16px 0"}}>
-        <div style={{display:"flex",alignItems:"center",padding:"0 4px 6px 20px",cursor:"pointer"}} onClick={()=>setFixedOpen(o=>!o)}>
-          <span style={{flex:1,fontSize:13,fontWeight:400,color:A.label2,letterSpacing:-0.08,textTransform:"uppercase"}}>Постоянные расходы · {fmtMoney(fixedTotal)} ₽</span>
-          <span style={{fontSize:18,color:A.label2,transform:fixedOpen?"rotate(90deg)":"none",transition:"transform .15s",marginRight:4}}>›</span>
+      {isWide ? (
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:24,alignItems:"start"}}>
+          <div>{incomeBlock}{totalsBlock}</div>
+          <div>{fixedBlock}{varBlock}</div>
         </div>
-        {fixedOpen && <Card>
-          {fixedExpenses.length === 0 && <div style={{padding:"14px 16px",color:A.label2,fontSize:15,fontFamily:SF,textAlign:"center"}}>Нет постоянных расходов</div>}
-          {fixedExpenses.map((e,i)=>(
-            <div key={e.id} style={{...rowStyle,borderBottom:i<fixedExpenses.length-1?`1px solid ${A.sep}`:"none"}}>
-              <span style={{flex:1,fontSize:17,fontFamily:SF,color:A.label}}>{e.name}</span>
-              <span style={{fontSize:15,fontFamily:SF,color:A.label2,marginRight:16}}>{fmtMoney(e.amount)} ₽</span>
-              <button onClick={()=>delFixed(e.id)} style={{width:28,height:28,borderRadius:"50%",background:A.red+"20",border:"none",cursor:"pointer",color:A.red,fontSize:16,fontWeight:700,display:"flex",alignItems:"center",justifyContent:"center"}}>×</button>
-            </div>
-          ))}
-          <AddRow onAdd={addFixed} placeholderName="Аренда, свет, байк..." placeholderAmt="Сумма ₽" hasBorder={fixedExpenses.length>0}/>
-        </Card>}
-      </div>
-
-      <div style={{padding:"20px 16px 0"}}>
-        <SectionHeader>Расходы · {MONTHS_G[month.m]}</SectionHeader>
-        <Card>
-          {(monthData.expenses||[]).length === 0 && <div style={{padding:"14px 16px",color:A.label2,fontSize:15,fontFamily:SF,textAlign:"center"}}>Расходов нет</div>}
-          {(monthData.expenses||[]).map((e,i,arr)=>(
-            <div key={e.id} style={{...rowStyle,borderBottom:i<arr.length-1?`1px solid ${A.sep}`:"none"}}>
-              <div style={{flex:1}}>
-                <div style={{fontSize:17,fontFamily:SF,color:A.label}}>{e.name}</div>
-                {e.date && <div style={{fontSize:12,fontFamily:SF,color:A.label2,marginTop:2}}>{e.date}</div>}
-              </div>
-              <span style={{fontSize:15,fontFamily:SF,color:A.label2,marginRight:16}}>{fmtMoney(e.amount)} ₽</span>
-              <button onClick={()=>delExp(e.id)} style={{width:28,height:28,borderRadius:"50%",background:A.red+"20",border:"none",cursor:"pointer",color:A.red,fontSize:16,fontWeight:700,display:"flex",alignItems:"center",justifyContent:"center"}}>×</button>
-            </div>
-          ))}
-          <AddRow onAdd={addExp} placeholderName="Продукты, кафе, такси..." placeholderAmt="Сумма ₽" hasBorder={(monthData.expenses||[]).length>0}/>
-        </Card>
-      </div>
-
-      <div style={{padding:"20px 16px 0"}}>
-        <SectionHeader>Итого</SectionHeader>
-        <Card>
-          {[
-            ["Доходы", fmtMoney(income)+" ₽", A.green],
-            ["Постоянные расходы", fmtMoney(fixedTotal)+" ₽", A.label],
-            ["Переменные расходы", fmtMoney(varTotal)+" ₽", A.label],
-            ["Всего потрачено", fmtMoney(totalSpent)+" ₽", A.red],
-          ].map(([label,val,color],i)=>(
-            <div key={label} style={{display:"flex",alignItems:"center",padding:"11px 16px",borderBottom:`1px solid ${A.sep}`}}>
-              <span style={{flex:1,fontSize:15,fontFamily:SF,color:A.label}}>{label}</span>
-              <span style={{fontSize:15,fontFamily:SF,color}}>{val}</span>
-            </div>
-          ))}
-          <div style={{display:"flex",alignItems:"center",padding:"14px 16px"}}>
-            <span style={{flex:1,fontSize:17,fontFamily:SF,fontWeight:600,color:A.label}}>Остаток</span>
-            <span style={{fontSize:20,fontFamily:SF,fontWeight:700,color:balance>=0?A.green:A.red}}>{balance>=0?"+":""}{fmtMoney(balance)} ₽</span>
-          </div>
-        </Card>
-      </div>
-
+      ) : (
+        <>{incomeBlock}{fixedBlock}{varBlock}{totalsBlock}</>
+      )}
     </div>
   );
 }
@@ -860,7 +933,60 @@ function compressImage(file, maxDim = 1280, quality = 0.75) {
   });
 }
 
-function WishlistTab() {
+function WishItemContent({w, isOpen, onToggleOpen, updateWish, delWish, pickPhoto, uploadingId}) {
+  return (
+    <>
+      <div style={{display:"flex",alignItems:"center",padding:"11px 16px",minHeight:52}}>
+        {w.photo
+          ? <img src={w.photo} alt="" style={{width:48,height:48,borderRadius:10,objectFit:"cover",marginRight:12,flexShrink:0}}/>
+          : <div style={{width:48,height:48,borderRadius:10,background:A.bg,marginRight:12,flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center"}}>
+              <span style={{fontSize:18,color:A.label3}}>✦</span>
+            </div>
+        }
+        <div style={{flex:1,minWidth:0}} onClick={onToggleOpen}>
+          <div style={{fontSize:17,fontFamily:SF,color:w.bought?A.label2:A.label,textDecoration:w.bought?"line-through":"none",letterSpacing:-0.41,lineHeight:"22px",cursor:"pointer"}}>{w.name}</div>
+          <div style={{display:"flex",alignItems:"center",gap:8,marginTop:2}}>
+            {w.price && <span style={{fontSize:13,fontFamily:SF,color:A.label2}}>{w.price} ₽</span>}
+            {w.bought && <span style={{fontSize:11,fontFamily:SF,fontWeight:600,color:A.green,background:A.green+"18",padding:"2px 7px",borderRadius:10}}>✓ Куплено</span>}
+          </div>
+        </div>
+        <button onClick={onToggleOpen} style={{background:"none",border:"none",cursor:"pointer",padding:"0 0 0 8px",color:A.label2,fontSize:18,lineHeight:1,transform:isOpen?"rotate(90deg)":"none",transition:"transform .15s"}}>›</button>
+      </div>
+      {isOpen && (
+        <div style={{padding:"0 16px 14px 56px",background:A.bg}}>
+          <div style={{fontSize:12,color:A.label2,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:6}}>Название</div>
+          <input value={w.name} onChange={e=>updateWish(w.id,"name",e.target.value)}
+            style={{width:"100%",background:A.card,border:`1px solid ${A.sep}`,borderRadius:10,padding:"10px 12px",fontSize:15,fontFamily:SF,color:A.label,boxSizing:"border-box",outline:"none",display:"block",marginBottom:10}}/>
+          <div style={{fontSize:12,color:A.label2,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:6}}>Фото</div>
+          {w.photo && <img src={w.photo} alt="" style={{width:"100%",maxHeight:200,borderRadius:10,objectFit:"cover",marginBottom:8,display:"block"}}/>}
+          <div style={{display:"flex",gap:8,marginBottom:10}}>
+            <button onClick={()=>pickPhoto(w.id)} disabled={uploadingId===w.id} style={{flex:1,padding:"10px",borderRadius:10,border:`1px solid ${A.blue}`,background:A.blue+"11",color:A.blue,fontSize:15,fontFamily:SF,fontWeight:500,cursor:uploadingId===w.id?"default":"pointer",opacity:uploadingId===w.id?0.6:1}}>
+              {uploadingId===w.id ? "Загрузка..." : "📷 Загрузить с устройства"}
+            </button>
+            {w.photo && <button onClick={()=>updateWish(w.id,"photo","")} style={{padding:"10px 12px",borderRadius:10,border:`1px solid ${A.sep}`,background:A.card,color:A.red,fontSize:13,fontFamily:SF,cursor:"pointer"}}>Удалить фото</button>}
+          </div>
+          <div style={{fontSize:12,color:A.label2,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:6}}>Сумма, ₽</div>
+          <input type="number" value={w.price} onChange={e=>updateWish(w.id,"price",e.target.value)} placeholder="0"
+            style={{width:"100%",background:A.card,border:`1px solid ${A.sep}`,borderRadius:10,padding:"10px 12px",fontSize:15,fontFamily:SF,color:A.label,boxSizing:"border-box",outline:"none",display:"block",marginBottom:10}}/>
+          <div style={{fontSize:12,color:A.label2,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:6}}>Ссылка на товар</div>
+          <input value={w.link} onChange={e=>updateWish(w.id,"link",e.target.value)} placeholder="https://..."
+            style={{width:"100%",background:A.card,border:`1px solid ${A.sep}`,borderRadius:10,padding:"10px 12px",fontSize:15,fontFamily:SF,color:A.blue,boxSizing:"border-box",outline:"none",display:"block",marginBottom:w.link?4:10}}/>
+          {w.link && <a href={w.link.startsWith("http")?w.link:`https://${w.link}`} target="_blank" rel="noreferrer" style={{display:"inline-block",marginBottom:10,fontSize:13,fontFamily:SF,color:A.blue}}>Открыть ↗</a>}
+          <div style={{fontSize:12,color:A.label2,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:6}}>Планирую купить</div>
+          <input type="date" value={w.plannedDate} onChange={e=>updateWish(w.id,"plannedDate",e.target.value)}
+            style={{width:"100%",background:A.card,border:`1px solid ${A.sep}`,borderRadius:10,padding:"10px 12px",fontSize:15,fontFamily:SF,color:A.label,boxSizing:"border-box",outline:"none",display:"block",marginBottom:14}}/>
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14}}>
+            <span style={{fontSize:17,fontFamily:SF,color:A.label,letterSpacing:-0.41}}>Куплено</span>
+            <IOSToggle value={!!w.bought} onChange={v=>updateWish(w.id,"bought",v)}/>
+          </div>
+          <button onClick={()=>delWish(w.id)} style={{color:A.red,background:"none",border:"none",cursor:"pointer",fontSize:15,fontFamily:SF,padding:0}}>Удалить</button>
+        </div>
+      )}
+    </>
+  );
+}
+
+function WishlistTab({isWide}) {
   const [wishlist, setWishlist] = useState(() => store.get("wishlist") || []);
   const [newWishName, setNewWishName] = useState("");
   const [expandedWish, setExpandedWish] = useState(null);
@@ -894,14 +1020,16 @@ function WishlistTab() {
     input.click();
   };
 
+  const sidePad = isWide ? 0 : 16;
+
   return (
-    <div style={{paddingBottom:100}}>
-      <div style={{padding:"16px 20px 4px"}}>
+    <div style={{paddingBottom: isWide ? 40 : 100}}>
+      <div style={{padding: isWide ? "20px 0 4px" : "16px 20px 4px"}}>
         <LargeTitle>Вишлист</LargeTitle>
         <div style={{fontSize:13,fontFamily:SF,color:A.label2,marginTop:4}}>Всё, что хочется купить</div>
       </div>
 
-      <div style={{padding:"16px 16px 0"}}>
+      <div style={{padding:`16px ${sidePad}px 0`}}>
         <Card>
           <div style={{display:"flex",alignItems:"center",padding:"10px 16px",gap:8}}>
             <input value={newWishName} onChange={e=>setNewWishName(e.target.value)} placeholder="Что хочу купить..." onKeyDown={e=>e.key==="Enter"&&addWish()}
@@ -911,66 +1039,28 @@ function WishlistTab() {
         </Card>
       </div>
 
-      <div style={{padding:"16px 16px 0"}}>
+      <div style={{padding:`16px ${sidePad}px 0`}}>
         {wishlist.length === 0 && (
           <div style={{textAlign:"center",color:A.label2,fontSize:15,fontFamily:SF,padding:"32px 0"}}>Список пуст</div>
         )}
         {wishlist.length > 0 && (
-          <Card>
-            {wishlist.map((w, i) => {
-              const isOpen = expandedWish === w.id;
-              return (
-                <div key={w.id} style={{borderBottom:i<wishlist.length-1||isOpen?`1px solid ${A.sep}`:"none"}}>
-                  <div style={{display:"flex",alignItems:"center",padding:"11px 16px",minHeight:52}}>
-                    {w.photo
-                      ? <img src={w.photo} alt="" style={{width:48,height:48,borderRadius:10,objectFit:"cover",marginRight:12,flexShrink:0}}/>
-                      : <div style={{width:48,height:48,borderRadius:10,background:A.bg,marginRight:12,flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center"}}>
-                          <span style={{fontSize:18,color:A.label3}}>✦</span>
-                        </div>
-                    }
-                    <div style={{flex:1,minWidth:0}} onClick={()=>setExpandedWish(isOpen?null:w.id)}>
-                      <div style={{fontSize:17,fontFamily:SF,color:w.bought?A.label2:A.label,textDecoration:w.bought?"line-through":"none",letterSpacing:-0.41,lineHeight:"22px",cursor:"pointer"}}>{w.name}</div>
-                      <div style={{display:"flex",alignItems:"center",gap:8,marginTop:2}}>
-                        {w.price && <span style={{fontSize:13,fontFamily:SF,color:A.label2}}>{w.price} ₽</span>}
-                        {w.bought && <span style={{fontSize:11,fontFamily:SF,fontWeight:600,color:A.green,background:A.green+"18",padding:"2px 7px",borderRadius:10}}>✓ Куплено</span>}
-                      </div>
-                    </div>
-                    <button onClick={()=>setExpandedWish(isOpen?null:w.id)} style={{background:"none",border:"none",cursor:"pointer",padding:"0 0 0 8px",color:A.label2,fontSize:18,lineHeight:1,transform:isOpen?"rotate(90deg)":"none",transition:"transform .15s"}}>›</button>
-                  </div>
-                  {isOpen && (
-                    <div style={{padding:"0 16px 14px 56px",background:A.bg}}>
-                      <div style={{fontSize:12,color:A.label2,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:6}}>Название</div>
-                      <input value={w.name} onChange={e=>updateWish(w.id,"name",e.target.value)}
-                        style={{width:"100%",background:A.card,border:`1px solid ${A.sep}`,borderRadius:10,padding:"10px 12px",fontSize:15,fontFamily:SF,color:A.label,boxSizing:"border-box",outline:"none",display:"block",marginBottom:10}}/>
-                      <div style={{fontSize:12,color:A.label2,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:6}}>Фото</div>
-                      {w.photo && <img src={w.photo} alt="" style={{width:"100%",maxHeight:200,borderRadius:10,objectFit:"cover",marginBottom:8,display:"block"}}/>}
-                      <div style={{display:"flex",gap:8,marginBottom:10}}>
-                        <button onClick={()=>pickPhoto(w.id)} disabled={uploadingId===w.id} style={{flex:1,padding:"10px",borderRadius:10,border:`1px solid ${A.blue}`,background:A.blue+"11",color:A.blue,fontSize:15,fontFamily:SF,fontWeight:500,cursor:uploadingId===w.id?"default":"pointer",opacity:uploadingId===w.id?0.6:1}}>
-                          {uploadingId===w.id ? "Загрузка..." : "📷 Загрузить с устройства"}
-                        </button>
-                        {w.photo && <button onClick={()=>updateWish(w.id,"photo","")} style={{padding:"10px 12px",borderRadius:10,border:`1px solid ${A.sep}`,background:A.card,color:A.red,fontSize:13,fontFamily:SF,cursor:"pointer"}}>Удалить фото</button>}
-                      </div>
-                      <div style={{fontSize:12,color:A.label2,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:6}}>Сумма, ₽</div>
-                      <input type="number" value={w.price} onChange={e=>updateWish(w.id,"price",e.target.value)} placeholder="0"
-                        style={{width:"100%",background:A.card,border:`1px solid ${A.sep}`,borderRadius:10,padding:"10px 12px",fontSize:15,fontFamily:SF,color:A.label,boxSizing:"border-box",outline:"none",display:"block",marginBottom:10}}/>
-                      <div style={{fontSize:12,color:A.label2,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:6}}>Ссылка на товар</div>
-                      <input value={w.link} onChange={e=>updateWish(w.id,"link",e.target.value)} placeholder="https://..."
-                        style={{width:"100%",background:A.card,border:`1px solid ${A.sep}`,borderRadius:10,padding:"10px 12px",fontSize:15,fontFamily:SF,color:A.blue,boxSizing:"border-box",outline:"none",display:"block",marginBottom:w.link?4:10}}/>
-                      {w.link && <a href={w.link.startsWith("http")?w.link:`https://${w.link}`} target="_blank" rel="noreferrer" style={{display:"inline-block",marginBottom:10,fontSize:13,fontFamily:SF,color:A.blue}}>Открыть ↗</a>}
-                      <div style={{fontSize:12,color:A.label2,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:6}}>Планирую купить</div>
-                      <input type="date" value={w.plannedDate} onChange={e=>updateWish(w.id,"plannedDate",e.target.value)}
-                        style={{width:"100%",background:A.card,border:`1px solid ${A.sep}`,borderRadius:10,padding:"10px 12px",fontSize:15,fontFamily:SF,color:A.label,boxSizing:"border-box",outline:"none",display:"block",marginBottom:14}}/>
-                      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14}}>
-                        <span style={{fontSize:17,fontFamily:SF,color:A.label,letterSpacing:-0.41}}>Куплено</span>
-                        <IOSToggle value={!!w.bought} onChange={v=>updateWish(w.id,"bought",v)}/>
-                      </div>
-                      <button onClick={()=>delWish(w.id)} style={{color:A.red,background:"none",border:"none",cursor:"pointer",fontSize:15,fontFamily:SF,padding:0}}>Удалить</button>
-                    </div>
-                  )}
+          isWide ? (
+            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(280px,1fr))",gap:16}}>
+              {wishlist.map(w => (
+                <Card key={w.id}>
+                  <WishItemContent w={w} isOpen={expandedWish===w.id} onToggleOpen={()=>setExpandedWish(expandedWish===w.id?null:w.id)} updateWish={updateWish} delWish={delWish} pickPhoto={pickPhoto} uploadingId={uploadingId}/>
+                </Card>
+              ))}
+            </div>
+          ) : (
+            <Card>
+              {wishlist.map((w, i) => (
+                <div key={w.id} style={{borderBottom:i<wishlist.length-1||expandedWish===w.id?`1px solid ${A.sep}`:"none"}}>
+                  <WishItemContent w={w} isOpen={expandedWish===w.id} onToggleOpen={()=>setExpandedWish(expandedWish===w.id?null:w.id)} updateWish={updateWish} delWish={delWish} pickPhoto={pickPhoto} uploadingId={uploadingId}/>
                 </div>
-              );
-            })}
-          </Card>
+              ))}
+            </Card>
+          )
         )}
       </div>
     </div>
@@ -1007,6 +1097,27 @@ function mergeAndApply(fbData) {
   });
 }
 
+function Sidebar({tabs, tab, setTab, syncBar}) {
+  return (
+    <div style={{width:240,flexShrink:0,background:A.card,borderRight:`1px solid ${A.sep}`,display:"flex",flexDirection:"column",height:"100dvh"}}>
+      <div style={{padding:"22px 22px 18px"}}>
+        <div style={{fontSize:19,fontWeight:700,fontFamily:SF,color:A.label,letterSpacing:-0.4}}>Мой календарь</div>
+      </div>
+      <div style={{flex:1,overflowY:"auto",padding:"0 12px"}}>
+        {tabs.map(t=>(
+          <button key={t.id} onClick={()=>setTab(t.id)} style={{display:"flex",alignItems:"center",gap:12,width:"100%",padding:"11px 12px",borderRadius:10,border:"none",background:tab===t.id?A.blue+"14":"transparent",cursor:"pointer",marginBottom:2,textAlign:"left"}}>
+            <span style={{fontSize:18,lineHeight:1,color:tab===t.id?A.blue:A.label2,width:22,textAlign:"center",flexShrink:0}}>{t.icon}</span>
+            <span style={{fontSize:15,fontFamily:SF,fontWeight:tab===t.id?600:400,color:tab===t.id?A.blue:A.label}}>{t.label}</span>
+          </button>
+        ))}
+      </div>
+      {syncBar && <div style={{borderTop:`1px solid ${A.sep}`}}>{syncBar}</div>}
+    </div>
+  );
+}
+
+const WIDE_MAXW = {today:1100, calendar:null, finance:1100, wishlist:1200, settings:640};
+
 export default function App() {
   const [tab, setTab] = useState("today");
   const [allDaily, setAllDaily] = useState({});
@@ -1017,6 +1128,7 @@ export default function App() {
   const [authLoading, setAuthLoading] = useState(FIREBASE_CONFIGURED);
   const unsubSnapshotsRef = useRef([]);
   const today = todayKey();
+  const isWide = useIsWide();
 
   const loadLocal = useCallback(() => {
     const ad = store.get("all-daily") || {};
@@ -1242,24 +1354,39 @@ export default function App() {
         button{-webkit-tap-highlight-color:transparent;}
       `}</style>
 
-      <div style={{background:A.bg,height:"100dvh",maxWidth:430,margin:"0 auto",fontFamily:SF,display:"flex",flexDirection:"column"}}>
-        {syncBar}
-        <div style={{flex:1,overflowY:"auto",paddingBottom:84}}>
-          {tab==="today"    && <TodayTab    dayData={todayData} onSave={saveToday} cycleData={cycleData} today={today} moveTask={moveTask}/>}
-          {tab==="calendar" && <CalendarTab allDaily={allDaily} cycleData={cycleData} saveDayData={saveDayData} saveDayView={saveDayView} moveTask={moveTask}/>}
-          {tab==="settings" && <SettingsTab cycleData={cycleData} saveCycle={saveCycle} allDaily={allDaily} streak={streak}/>}
-          {tab==="finance"  && <FinanceTab/>}
-          {tab==="wishlist" && <WishlistTab/>}
+      {isWide ? (
+        <div style={{display:"flex",height:"100dvh",background:A.bg,fontFamily:SF}}>
+          <Sidebar tabs={tabs} tab={tab} setTab={setTab} syncBar={syncBar}/>
+          <div style={{flex:1,overflowY:"auto"}}>
+            <div style={{maxWidth:WIDE_MAXW[tab]||undefined,margin:WIDE_MAXW[tab]?"0 auto":0,padding:"0 36px 40px"}}>
+              {tab==="today"    && <TodayTab    dayData={todayData} onSave={saveToday} cycleData={cycleData} today={today} moveTask={moveTask} isWide/>}
+              {tab==="calendar" && <CalendarTab allDaily={allDaily} cycleData={cycleData} saveDayData={saveDayData} saveDayView={saveDayView} moveTask={moveTask} isWide/>}
+              {tab==="settings" && <SettingsTab cycleData={cycleData} saveCycle={saveCycle} allDaily={allDaily} streak={streak}/>}
+              {tab==="finance"  && <FinanceTab isWide/>}
+              {tab==="wishlist" && <WishlistTab isWide/>}
+            </div>
+          </div>
         </div>
-        <div style={{position:"fixed",bottom:0,left:"50%",transform:"translateX(-50%)",width:"100%",maxWidth:430,background:A.tabBar,borderTop:`1px solid ${A.tabBarBorder}`,display:"flex",paddingBottom:"env(safe-area-inset-bottom,8px)",backdropFilter:"blur(20px)"}}>
-          {tabs.map(t=>(
-            <button key={t.id} onClick={()=>setTab(t.id)} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:2,padding:"10px 4px 4px",background:"none",border:"none",cursor:"pointer",color:tab===t.id?A.blue:A.label2}}>
-              <span style={{fontSize:22,lineHeight:1}}>{t.icon}</span>
-              <span style={{fontSize:10,fontFamily:SF,fontWeight:tab===t.id?600:400}}>{t.label}</span>
-            </button>
-          ))}
+      ) : (
+        <div style={{background:A.bg,height:"100dvh",maxWidth:430,margin:"0 auto",fontFamily:SF,display:"flex",flexDirection:"column"}}>
+          {syncBar}
+          <div style={{flex:1,overflowY:"auto",paddingBottom:84}}>
+            {tab==="today"    && <TodayTab    dayData={todayData} onSave={saveToday} cycleData={cycleData} today={today} moveTask={moveTask}/>}
+            {tab==="calendar" && <CalendarTab allDaily={allDaily} cycleData={cycleData} saveDayData={saveDayData} saveDayView={saveDayView} moveTask={moveTask}/>}
+            {tab==="settings" && <SettingsTab cycleData={cycleData} saveCycle={saveCycle} allDaily={allDaily} streak={streak}/>}
+            {tab==="finance"  && <FinanceTab/>}
+            {tab==="wishlist" && <WishlistTab/>}
+          </div>
+          <div style={{position:"fixed",bottom:0,left:"50%",transform:"translateX(-50%)",width:"100%",maxWidth:430,background:A.tabBar,borderTop:`1px solid ${A.tabBarBorder}`,display:"flex",paddingBottom:"env(safe-area-inset-bottom,8px)",backdropFilter:"blur(20px)"}}>
+            {tabs.map(t=>(
+              <button key={t.id} onClick={()=>setTab(t.id)} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:2,padding:"10px 4px 4px",background:"none",border:"none",cursor:"pointer",color:tab===t.id?A.blue:A.label2}}>
+                <span style={{fontSize:22,lineHeight:1}}>{t.icon}</span>
+                <span style={{fontSize:10,fontFamily:SF,fontWeight:tab===t.id?600:400}}>{t.label}</span>
+              </button>
+            ))}
+          </div>
         </div>
-      </div>
+      )}
     </>
   );
 }
