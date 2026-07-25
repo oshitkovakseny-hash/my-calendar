@@ -350,7 +350,7 @@ function CalendarTab({allDaily, cycleData, saveDayData, saveDayView, moveTask, i
     Object.entries(allDaily).forEach(([key, day]) => {
       if (key >= selKey) return;
       (day.todos || []).forEach(t => {
-        if (!t.done && !carriedIds.has(t.id)) {
+        if (!t.done && !t.fromGoogle && !carriedIds.has(t.id)) {
           carried.push({...t, _src: key});
           carriedIds.add(t.id);
         }
@@ -1326,7 +1326,7 @@ export default function App() {
   Object.entries(allDaily).forEach(([key, day]) => {
     if (key >= today) return;
     (day.todos || []).forEach(t => {
-      if (!t.done && !carriedIds.has(t.id)) {
+      if (!t.done && !t.fromGoogle && !carriedIds.has(t.id)) {
         carriedOpen.push({...t, _src: key});
         carriedIds.add(t.id);
       }
@@ -1350,9 +1350,9 @@ export default function App() {
       incoming.filter(t => t._src).forEach(t => { (bySrc[t._src] = bySrc[t._src] || []).push(t); });
       Object.keys(prev).forEach(key => {
         if (key >= today) return;
-        const prevOpen = (prev[key].todos || []).filter(t => !t.done);
+        const prevOpen = (prev[key].todos || []).filter(t => !t.done && !t.fromGoogle);
         if (prevOpen.length === 0 && !bySrc[key]) return;
-        const keptDone = (prev[key].todos || []).filter(t => t.done);
+        const keptDone = (prev[key].todos || []).filter(t => t.done || t.fromGoogle);
         const edited = (bySrc[key] || []).map(({_src, ...t}) => t);
         na[key] = {...prev[key], todos: [...keptDone, ...edited]};
       });
@@ -1373,9 +1373,9 @@ export default function App() {
       incoming.filter(t => t._src).forEach(t => { (bySrc[t._src] = bySrc[t._src] || []).push(t); });
       Object.keys(prev).forEach(key => {
         if (key >= selKey) return;
-        const prevOpen = (prev[key].todos || []).filter(t => !t.done);
+        const prevOpen = (prev[key].todos || []).filter(t => !t.done && !t.fromGoogle);
         if (prevOpen.length === 0 && !bySrc[key]) return;
-        const keptDone = (prev[key].todos || []).filter(t => t.done);
+        const keptDone = (prev[key].todos || []).filter(t => t.done || t.fromGoogle);
         const edited = (bySrc[key] || []).map(({_src, ...t}) => t);
         na[key] = {...prev[key], todos: [...keptDone, ...edited]};
       });
