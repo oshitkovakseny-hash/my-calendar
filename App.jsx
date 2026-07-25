@@ -924,32 +924,54 @@ function buildUnifiedReportHTML(daysInRange, allDaily, cycleData, from, to, fmt,
     </body></html>`;
 }
 
-function compressImage(file, maxDim = 1280, quality = 0.75) {
+function drawToJpegDataUrl(source, srcWidth, srcHeight, maxDim, quality) {
+  let width = srcWidth, height = srcHeight;
+  if (width > maxDim || height > maxDim) {
+    if (width > height) { height = Math.round(height * maxDim / width); width = maxDim; }
+    else { width = Math.round(width * maxDim / height); height = maxDim; }
+  }
+  const canvas = document.createElement("canvas");
+  canvas.width = width; canvas.height = height;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("canvas 2d context unavailable");
+  ctx.fillStyle = "#fff";
+  ctx.fillRect(0, 0, width, height);
+  ctx.drawImage(source, 0, 0, width, height);
+  return canvas.toDataURL("image/jpeg", quality);
+}
+
+// Запасной путь через <img>+object URL — используется, если createImageBitmap недоступен/упал.
+function compressImageViaImageElement(file, maxDim, quality) {
   return new Promise((resolve, reject) => {
     const url = URL.createObjectURL(file);
     const img = new Image();
     img.onload = () => {
       URL.revokeObjectURL(url);
-      let { width, height } = img;
-      if (width > maxDim || height > maxDim) {
-        if (width > height) { height = Math.round(height * maxDim / width); width = maxDim; }
-        else { width = Math.round(width * maxDim / height); height = maxDim; }
-      }
-      const canvas = document.createElement("canvas");
-      canvas.width = width; canvas.height = height;
-      const ctx = canvas.getContext("2d");
-      if (!ctx) { reject(new Error("canvas 2d context unavailable")); return; }
-      ctx.fillStyle = "#fff";
-      ctx.fillRect(0, 0, width, height);
-      ctx.drawImage(img, 0, 0, width, height);
-      let dataUrl;
-      try { dataUrl = canvas.toDataURL("image/jpeg", quality); }
-      catch (e) { reject(e); return; }
-      resolve(dataUrl);
+      try { resolve(drawToJpegDataUrl(img, img.width, img.height, maxDim, quality)); }
+      catch (e) { reject(e); }
     };
     img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("image decode failed")); };
     img.src = url;
   });
+}
+
+// createImageBitmap декодирует файл напрямую в компактный битмап (без DOM Image
+// и object URL) и позволяет сразу освободить память через bitmap.close() —
+// это заметно снижает пиковое потребление памяти на больших фото с телефона,
+// что важно на iOS, где веб-страница может быть перезапущена при нехватке памяти.
+async function compressImage(file, maxDim = 1280, quality = 0.75) {
+  if (typeof createImageBitmap !== "function") {
+    return compressImageViaImageElement(file, maxDim, quality);
+  }
+  let bitmap;
+  try {
+    bitmap = await createImageBitmap(file);
+    return drawToJpegDataUrl(bitmap, bitmap.width, bitmap.height, maxDim, quality);
+  } catch (e) {
+    return compressImageViaImageElement(file, maxDim, quality);
+  } finally {
+    bitmap?.close();
+  }
 }
 
 function WishItemContent({w, isOpen, onToggleOpen, updateWish, delWish, pickPhoto, uploadingId}) {
