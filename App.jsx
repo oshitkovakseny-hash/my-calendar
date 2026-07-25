@@ -25,6 +25,11 @@ async function fbSet(key, val) {
   catch (e) { console.warn("Firebase write error:", e); }
 }
 
+// Фото в вишлисте храним только на устройстве: даже сжатые, несколько штук
+// легко превышают лимит документа Firestore (~1 МБ), из-за чего запись в
+// облако тихо не проходит, а потом старая версия без фото затирает локальную.
+const stripWishlistPhotos = val => Array.isArray(val) ? val.map(({photo, ...rest}) => rest) : val;
+
 const store = {
   get(key) {
     try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : null; }
@@ -34,7 +39,7 @@ const store = {
     let ok = true;
     try { localStorage.setItem(key, JSON.stringify(val)); }
     catch (e) { ok = false; console.warn("localStorage write error:", e); }
-    fbSet(key, val);
+    fbSet(key, key === "wishlist" ? stripWishlistPhotos(val) : val);
     return ok;
   },
 };
@@ -1100,10 +1105,22 @@ async function loadAllFromFirebase(uid) {
   return results;
 }
 
+// Подставляет обратно локальные фото вишлиста (по id), т.к. в Firebase их нет —
+// они там никогда не хранятся (см. stripWishlistPhotos).
+function restoreWishlistPhotos(remoteWishlist) {
+  if (!Array.isArray(remoteWishlist)) return remoteWishlist;
+  let localVal = [];
+  try { localVal = JSON.parse(localStorage.getItem("wishlist")) || []; } catch {}
+  const localById = new Map(localVal.map(w => [w.id, w]));
+  return remoteWishlist.map(w => ({...w, photo: localById.get(w.id)?.photo || ""}));
+}
+
 function mergeAndApply(fbData) {
-  // Firebase data wins (it's the latest from any device)
+  // Firebase data wins (it's the latest from any device), кроме фото вишлиста —
+  // они привязаны к устройству и восстанавливаются из уже сохранённых локально.
   Object.entries(fbData).forEach(([k, v]) => {
-    try { localStorage.setItem(k, JSON.stringify(v)); } catch {}
+    const toStore = k === "wishlist" ? restoreWishlistPhotos(v) : v;
+    try { localStorage.setItem(k, JSON.stringify(toStore)); } catch {}
   });
 }
 
@@ -1271,17 +1288,17 @@ export default function App() {
         const val = snap.data().value;
         let localVal;
         try { localVal = JSON.parse(localStorage.getItem(key)); } catch {}
-        if (JSON.stringify(val) === JSON.stringify(localVal)) return;
+        const merged = key === "wishlist" ? restoreWishlistPhotos(val) : val;
+        if (JSON.stringify(merged) === JSON.stringify(localVal)) return;
         // Remote changed — update localStorage and React state
         _syncDisabled = true;
-        try { localStorage.setItem(key, JSON.stringify(val)); } catch {}
+        try { localStorage.setItem(key, JSON.stringify(merged)); } catch {}
         _syncDisabled = false;
         if (key === "all-daily") {
-          const tk = todayKey();
-          setAllDaily(val || {});
-          setStreak(computeStreak(val || {}, todayKey()));
+          setAllDaily(merged || {});
+          setStreak(computeStreak(merged || {}, todayKey()));
         } else if (key === "cycle-data") {
-          setCycleData(val || {startDates:[], length:28});
+          setCycleData(merged || {startDates:[], length:28});
         }
         setSyncStatus("synced");
       }, () => { setSyncStatus("error"); });
@@ -1307,7 +1324,7 @@ export default function App() {
           // Push local data to Firebase (in case local has newer data)
           SYNC_KEYS.forEach(key => {
             const local = store.get(key);
-            if (local) fbSet(key, local);
+            if (local) fbSet(key, key === "wishlist" ? stripWishlistPhotos(local) : local);
           });
           setSyncStatus("synced");
           subscribeFirestore(u.uid);
