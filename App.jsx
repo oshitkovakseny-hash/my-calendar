@@ -266,7 +266,7 @@ function TodayTab({dayData, onSave, cycleData, today, moveTask, isWide}) {
   );
 }
 
-function MonthGrid({year, month, allDaily, cycleData, todayKey, selKey, onSelect, isWide}) {
+function MonthGrid({year, month, allDaily, cycleData, todayKey, selKey, onSelect, isWide, showTitle=true}) {
   const firstDay = new Date(year, month, 1);
   const lastDay  = new Date(year, month+1, 0);
   const startDow = (firstDay.getDay()+6) % 7;
@@ -278,9 +278,11 @@ function MonthGrid({year, month, allDaily, cycleData, todayKey, selKey, onSelect
 
   return (
     <div style={{marginBottom:22}}>
-      <div style={{padding: isWide ? "0 0 8px" : "0 20px 8px", fontSize:20,fontWeight:700,fontFamily:SF,color:A.label,letterSpacing:-0.4}}>
-        {MONTHS[month]} <span style={{color:A.label2}}>{year}</span>
-      </div>
+      {showTitle && (
+        <div style={{padding: isWide ? "0 0 8px" : "0 20px 8px", fontSize:20,fontWeight:700,fontFamily:SF,color:A.label,letterSpacing:-0.4}}>
+          {MONTHS[month]} <span style={{color:A.label2}}>{year}</span>
+        </div>
+      )}
       <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",margin: isWide ? 0 : "0 10px",borderTop:`1px solid ${A.sep}`,borderLeft:`1px solid ${A.sep}`,borderRadius:4,overflow:"hidden"}}>
         {days.map((day,i)=>{
           const cellBorder={borderRight:`1px solid ${A.sep}`,borderBottom:`1px solid ${A.sep}`};
@@ -326,6 +328,7 @@ function CalendarTab({allDaily, cycleData, saveDayData, saveDayView, moveTask, i
   const todayKey = toKey(todayD);
 
   const [range, setRange] = useState({start:-3, end:3});
+  const [calMonth, setCalMonth] = useState(new Date(baseY, baseM, 1));
   const [selectedDay, setSelectedDay] = useState(todayD);
   const [jumpTick, setJumpTick] = useState(0);
   const rootRef = useRef(null);
@@ -333,6 +336,7 @@ function CalendarTab({allDaily, cycleData, saveDayData, saveDayView, moveTask, i
   const bottomSentinelRef = useRef(null);
 
   useEffect(() => {
+    if (!isWide) return;
     const scrollEl = getScrollParent(rootRef.current);
     const topEl = topSentinelRef.current, bottomEl = bottomSentinelRef.current;
     if (!scrollEl || !topEl || !bottomEl) return;
@@ -349,18 +353,29 @@ function CalendarTab({allDaily, cycleData, saveDayData, saveDayView, moveTask, i
     observer.observe(topEl);
     observer.observe(bottomEl);
     return () => observer.disconnect();
-  }, []);
+  }, [isWide]);
 
   useEffect(() => {
-    if (jumpTick === 0) return;
+    if (jumpTick === 0 || !isWide) return;
     const el = rootRef.current?.querySelector(`[data-daykey="${todayKey}"]`);
     if (el) el.scrollIntoView({block:"center"});
   }, [jumpTick]);
 
   const goToToday = () => {
-    setRange({start:-3, end:3});
     setSelectedDay(new Date());
-    setJumpTick(t => t+1);
+    if (isWide) {
+      setRange({start:-3, end:3});
+      setJumpTick(t => t+1);
+    } else {
+      setCalMonth(new Date(baseY, baseM, 1));
+    }
+  };
+  const prevMonth = () => setCalMonth(m => new Date(m.getFullYear(), m.getMonth()-1, 1));
+  const nextMonth = () => setCalMonth(m => new Date(m.getFullYear(), m.getMonth()+1, 1));
+  const monthInputValue = `${calMonth.getFullYear()}-${pad(calMonth.getMonth()+1)}`;
+  const onMonthPick = e => {
+    const [y, m] = e.target.value.split("-").map(Number);
+    if (y && m) setCalMonth(new Date(y, m-1, 1));
   };
 
   const months = [];
@@ -395,7 +410,7 @@ function CalendarTab({allDaily, cycleData, saveDayData, saveDayView, moveTask, i
   }
 
   const weekdayHeader = (
-    <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",padding: isWide ? "0 0 6px" : "12px 10px 6px",position:"sticky",top:0,background:A.bg,zIndex:1}}>
+    <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",padding: isWide ? "0 0 6px" : "12px 10px 6px",position: isWide ? "sticky" : "static",top:0,background:A.bg,zIndex:1}}>
       {DAYS_S.map(d=><div key={d} style={{textAlign:"center",fontSize:12,fontFamily:SF,fontWeight:600,color:A.label2}}>{d}</div>)}
     </div>
   );
@@ -423,9 +438,21 @@ function CalendarTab({allDaily, cycleData, saveDayData, saveDayView, moveTask, i
 
   return (
     <div ref={rootRef} style={{paddingBottom: isWide ? 40 : 100}}>
-      <div style={{padding: isWide ? "20px 0 0" : "16px 20px 0",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
-        <LargeTitle>Календарь</LargeTitle>
-        <button onClick={goToToday} style={{height:32,padding:"0 14px",borderRadius:16,background:A.bg,border:"none",cursor:"pointer",fontSize:13,fontFamily:SF,fontWeight:600,color:A.blue}}>Сегодня</button>
+      <div style={{padding: isWide ? "20px 0 0" : "16px 20px 0",display:"flex",flexWrap:"wrap",rowGap:8,alignItems:"center",justifyContent:"space-between"}}>
+        {isWide ? (
+          <LargeTitle>Календарь</LargeTitle>
+        ) : (
+          <div style={{position:"relative",minWidth:0,flexShrink:1}}>
+            <LargeTitle>{MONTHS[calMonth.getMonth()]} <span style={{color:A.label2}}>{calMonth.getFullYear()}</span></LargeTitle>
+            <input type="month" value={monthInputValue} onChange={onMonthPick} aria-label="Выбрать месяц"
+              style={{position:"absolute",inset:0,opacity:0,border:"none",cursor:"pointer",width:"100%"}}/>
+          </div>
+        )}
+        <div style={{display:"flex",gap:8,alignItems:"center",flexShrink:0,marginLeft:"auto"}}>
+          {!isWide && <button onClick={prevMonth} style={{width:32,height:32,borderRadius:"50%",background:A.bg,border:"none",cursor:"pointer",fontSize:16,color:A.blue}}>‹</button>}
+          <button onClick={goToToday} style={{height:32,padding:"0 14px",borderRadius:16,background:A.bg,border:"none",cursor:"pointer",fontSize:13,fontFamily:SF,fontWeight:600,color:A.blue,whiteSpace:"nowrap"}}>Сегодня</button>
+          {!isWide && <button onClick={nextMonth} style={{width:32,height:32,borderRadius:"50%",background:A.bg,border:"none",cursor:"pointer",fontSize:16,color:A.blue}}>›</button>}
+        </div>
       </div>
 
       {isWide ? (
@@ -434,7 +461,11 @@ function CalendarTab({allDaily, cycleData, saveDayData, saveDayView, moveTask, i
           <div style={{width:380,flexShrink:0,position:"sticky",top:0,maxHeight:"calc(100dvh - 24px)",overflowY:"auto"}}>{detailPanel}</div>
         </div>
       ) : (
-        <>{monthList}{detailPanel}</>
+        <>
+          {weekdayHeader}
+          <MonthGrid year={calMonth.getFullYear()} month={calMonth.getMonth()} allDaily={allDaily} cycleData={cycleData} todayKey={todayKey} selKey={selKey} onSelect={setSelectedDay} isWide={false} showTitle={false}/>
+          {detailPanel}
+        </>
       )}
     </div>
   );
