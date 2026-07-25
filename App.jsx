@@ -111,7 +111,7 @@ function IOSToggle({value,onChange}) {
   </div>;
 }
 
-function TaskList({dayData, onSave, currentKey, onMoveTask}) {
+function TaskList({dayData, onSave, currentKey, onMoveTask, onDismissGoogle}) {
   const [newTodo, setNewTodo] = useState("");
   const [newTag, setNewTag] = useState(null);
   const [expandedId, setExpandedId] = useState(null);
@@ -126,7 +126,12 @@ function TaskList({dayData, onSave, currentKey, onMoveTask}) {
     setNewTodo(""); setNewTag(null); setExpandedId(created.id);
   };
   const toggle = id => onSave({...dayData, todos:todos.map(t=>t.id===id?{...t,done:!t.done}:t)});
-  const del = id => { onSave({...dayData, todos:todos.filter(t=>t.id!==id)}); setExpandedId(null); };
+  const del = id => {
+    const t = todos.find(x=>x.id===id);
+    if (t?.fromGoogle && t?.gcalId && onDismissGoogle) onDismissGoogle(t.gcalId);
+    onSave({...dayData, todos:todos.filter(t=>t.id!==id)});
+    setExpandedId(null);
+  };
   const updateField = (id, field, val) => onSave({...dayData, todos:todos.map(t=>t.id===id?{...t,[field]:val}:t)});
 
   const doneCount = todos.filter(t => t.done).length;
@@ -166,6 +171,7 @@ function TaskList({dayData, onSave, currentKey, onMoveTask}) {
                   <div style={{display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
                     <span style={{fontSize:17,fontFamily:SF,color:t.done?A.label2:A.label,textDecoration:t.done?"line-through":"none",letterSpacing:-0.41,lineHeight:"22px"}}>{t.text}</span>
                     {t.tag && <TagPill tag={t.tag}/>}
+                    {t.fromGoogle && <span style={{display:"inline-flex",alignItems:"center",fontSize:10,fontFamily:SF,fontWeight:600,padding:"2px 7px",borderRadius:10,background:"#4285F422",color:"#4285F4",letterSpacing:0.1,lineHeight:"16px"}}>📅 Google</span>}
                   </div>
                   {!isOpen && t.note && <div style={{fontSize:13,fontFamily:SF,color:A.label2,marginTop:2,lineHeight:"17px"}}>{t.note}</div>}
                   {!isOpen && t.link && <div style={{fontSize:13,fontFamily:SF,color:A.blue,marginTop:2}}>🔗 {t.link}</div>}
@@ -174,6 +180,7 @@ function TaskList({dayData, onSave, currentKey, onMoveTask}) {
               </div>
               {isOpen && (
                 <div style={{padding:"0 16px 14px 50px",background:A.bg}}>
+                  {t.fromGoogle && <div style={{fontSize:12,fontFamily:SF,color:A.label2,lineHeight:"16px",marginBottom:10}}>Это событие из Google Calendar. Название и время обновятся при следующей синхронизации.</div>}
                   <div style={{fontSize:12,color:A.label2,textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:6}}>Текст задачи</div>
                   <input value={t.text||""} onChange={e=>updateField(t.id,"text",e.target.value)} placeholder="Название задачи"
                     style={{width:"100%",background:A.card,border:`1px solid ${A.sep}`,borderRadius:10,padding:"10px 12px",fontSize:15,fontFamily:SF,color:A.label,boxSizing:"border-box",outline:"none",display:"block",marginBottom:10}}/>
@@ -215,12 +222,12 @@ function TaskList({dayData, onSave, currentKey, onMoveTask}) {
   );
 }
 
-function TodayTab({dayData, onSave, cycleData, today, moveTask, isWide}) {
+function TodayTab({dayData, onSave, cycleData, today, moveTask, isWide, onDismissGoogle}) {
   const now = new Date(), phase = getCyclePhase(now, cycleData);
 
   const tasksBlock = (
     <div style={isWide ? {} : {padding:"8px 16px 0"}}>
-      <TaskList dayData={dayData} onSave={onSave} currentKey={today} onMoveTask={moveTask}/>
+      <TaskList dayData={dayData} onSave={onSave} currentKey={today} onMoveTask={moveTask} onDismissGoogle={onDismissGoogle}/>
     </div>
   );
   const notesBlock = (
@@ -310,7 +317,7 @@ function MonthGrid({year, month, allDaily, cycleData, todayKey, selKey, onSelect
   );
 }
 
-function CalendarTab({allDaily, cycleData, saveDayData, saveDayView, moveTask, isWide}) {
+function CalendarTab({allDaily, cycleData, saveDayData, saveDayView, moveTask, isWide, onDismissGoogle}) {
   const todayD = new Date();
   const baseY = todayD.getFullYear(), baseM = todayD.getMonth();
   const todayKey = toKey(todayD);
@@ -374,7 +381,7 @@ function CalendarTab({allDaily, cycleData, saveDayData, saveDayView, moveTask, i
         <div style={{fontSize:22,fontWeight:700,fontFamily:SF,color:A.label,letterSpacing:-0.4}}>{isSelToday?"Сегодня":`${selectedDay.getDate()} ${MONTHS_G[selectedDay.getMonth()]} ${selectedDay.getFullYear()}`}</div>
         {selPhase&&<span style={{fontSize:13,fontFamily:SF,fontWeight:500,color:selPhase.color}}>{selPhase.label} · день {selPhase.day}</span>}
       </div>
-      <div style={{padding: isWide ? "8px 0 0" : "8px 16px 0"}}><TaskList dayData={selData} onSave={selKey<=todayKey ? d=>saveDayView(selKey,d) : d=>saveDayData(selKey,d)} currentKey={selKey} onMoveTask={moveTask}/></div>
+      <div style={{padding: isWide ? "8px 0 0" : "8px 16px 0"}}><TaskList dayData={selData} onSave={selKey<=todayKey ? d=>saveDayView(selKey,d) : d=>saveDayData(selKey,d)} currentKey={selKey} onMoveTask={moveTask} onDismissGoogle={onDismissGoogle}/></div>
     </div>
   );
 
@@ -444,7 +451,7 @@ function buildReportHTML(daysInRange, allDaily, cycleData, from, to, fmt, goodN,
     </body></html>`;
 }
 
-function SettingsTab({cycleData, saveCycle, allDaily, streak}) {
+function SettingsTab({cycleData, saveCycle, allDaily, streak, firebaseUser, gcalConnected, gcalEmail, gcalSyncing, gcalLastSync, gcalError, onConnectGoogle, onSyncGoogleNow, onDisconnectGoogle}) {
   const [localLen, setLocalLen] = useState(String(cycleData.length||28));
   const today = todayKey(), phase = getCyclePhase(new Date(), cycleData);
   const addStart = () => { if(cycleData.startDates?.includes(today))return; saveCycle({...cycleData,startDates:[...(cycleData.startDates||[]),today]}); };
@@ -544,6 +551,44 @@ function SettingsTab({cycleData, saveCycle, allDaily, streak}) {
             <span style={{flex:1,fontSize:17,fontFamily:SF,color:A.blue,letterSpacing:-0.41}}>Импортировать данные</span>
             <span style={{fontSize:13,fontFamily:SF,color:A.label2}}>↑ JSON</span>
           </div>
+        </Card>
+      </div>
+      <div style={{padding:"20px 16px 0"}}>
+        <SectionHeader>Google Calendar</SectionHeader>
+        <Card>
+          {!firebaseUser ? (
+            <div style={{padding:"14px 16px",fontSize:14,fontFamily:SF,color:A.label2,lineHeight:"19px"}}>
+              Сначала войдите через Google (в шапке экрана), чтобы подключить календарь.
+            </div>
+          ) : !gcalConnected ? (
+            <div style={{padding:"14px 16px"}}>
+              <div style={{fontSize:14,fontFamily:SF,color:A.label2,lineHeight:"19px",marginBottom:12}}>
+                События из вашего Google Calendar будут появляться здесь как задачи. Работает только в одну сторону: то, что вы добавляете в этом приложении, в Google Calendar не попадает.
+              </div>
+              <button onClick={onConnectGoogle} style={{width:"100%",padding:"12px",borderRadius:10,border:"none",background:A.blue,color:"#fff",fontSize:15,fontFamily:SF,fontWeight:600,cursor:"pointer"}}>
+                Подключить Google Calendar
+              </button>
+            </div>
+          ) : (
+            <div style={{padding:"14px 16px"}}>
+              <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:10}}>
+                <div style={{width:8,height:8,borderRadius:"50%",background:A.green,flexShrink:0}}/>
+                <span style={{fontSize:15,fontFamily:SF,color:A.label,fontWeight:500}}>Подключено{gcalEmail?`: ${gcalEmail}`:""}</span>
+              </div>
+              <div style={{fontSize:13,fontFamily:SF,color:A.label2,marginBottom:12}}>
+                {gcalSyncing ? "Синхронизация..." : gcalLastSync ? `Последняя синхронизация: ${new Date(gcalLastSync).toLocaleTimeString("ru-RU",{hour:"2-digit",minute:"2-digit"})}` : "Ещё не синхронизировано"}
+              </div>
+              <div style={{display:"flex",gap:8}}>
+                <button onClick={onSyncGoogleNow} disabled={gcalSyncing} style={{flex:1,padding:"10px",borderRadius:10,border:"none",background:A.blue,color:"#fff",fontSize:14,fontFamily:SF,fontWeight:600,cursor:gcalSyncing?"default":"pointer",opacity:gcalSyncing?0.6:1}}>
+                  Синхронизировать сейчас
+                </button>
+                <button onClick={onDisconnectGoogle} style={{padding:"10px 14px",borderRadius:10,border:`1px solid ${A.sep}`,background:A.card,color:A.red,fontSize:14,fontFamily:SF,cursor:"pointer"}}>
+                  Отключить
+                </button>
+              </div>
+            </div>
+          )}
+          {gcalError && <div style={{padding:"0 16px 14px",fontSize:13,fontFamily:SF,color:A.red}}>{gcalError}</div>}
         </Card>
       </div>
       <div style={{padding:"20px 16px 0"}}>
@@ -1062,6 +1107,75 @@ function mergeAndApply(fbData) {
   });
 }
 
+const GCAL_SCOPE = "https://www.googleapis.com/auth/calendar.readonly";
+const GCAL_PAST_DAYS = 14;
+const GCAL_FUTURE_DAYS = 180;
+
+async function fetchGoogleEvents(accessToken, timeMin, timeMax) {
+  const params = new URLSearchParams({
+    timeMin: timeMin.toISOString(),
+    timeMax: timeMax.toISOString(),
+    singleEvents: "true",
+    orderBy: "startTime",
+    maxResults: "250",
+  });
+  const res = await fetch(`https://www.googleapis.com/calendar/v3/calendars/primary/events?${params}`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  if (!res.ok) throw new Error(`GCAL_HTTP_${res.status}`);
+  const data = await res.json();
+  return data.items || [];
+}
+
+// Однонаправленный импорт: события Google Calendar кладём в allDaily как задачи
+// с меткой fromGoogle+gcalId. Ничего из allDaily обратно в Google не пишем.
+function mergeGoogleEvents(prevAllDaily, events, rangeStartKey, rangeEndKey, dismissedIds) {
+  const na = {...prevAllDaily};
+  const seenByDay = {};
+
+  events.forEach(ev => {
+    if (ev.status === "cancelled") return;
+    if (dismissedIds.has(ev.id)) return;
+    const dateKey = ev.start?.date || (ev.start?.dateTime ? toKey(new Date(ev.start.dateTime)) : null);
+    if (!dateKey) return;
+    (seenByDay[dateKey] = seenByDay[dateKey] || new Set()).add(ev.id);
+
+    const day = na[dateKey] || emptyDay();
+    const todos = [...(day.todos || [])];
+    const idx = todos.findIndex(t => t.gcalId === ev.id);
+    const timeLabel = ev.start?.dateTime
+      ? new Date(ev.start.dateTime).toLocaleTimeString("ru-RU", {hour:"2-digit", minute:"2-digit"})
+      : "Весь день";
+    const task = {
+      id: idx >= 0 ? todos[idx].id : `gcal-${ev.id}`,
+      text: ev.summary || "Без названия",
+      done: idx >= 0 ? todos[idx].done : false,
+      tag: idx >= 0 ? todos[idx].tag : null,
+      note: [timeLabel, ev.location].filter(Boolean).join(" · "),
+      link: ev.htmlLink || "",
+      gcalId: ev.id,
+      fromGoogle: true,
+    };
+    if (idx >= 0) todos[idx] = task; else todos.push(task);
+    na[dateKey] = {...day, todos};
+  });
+
+  // Убираем импортированные задачи, чьи события пропали из Google Calendar,
+  // но только в пределах синхронизированного диапазона дат.
+  let d = parseKey(rangeStartKey);
+  const endD = parseKey(rangeEndKey);
+  while (d <= endD) {
+    const key = toKey(d);
+    const todos = na[key]?.todos;
+    if (todos?.some(t => t.fromGoogle)) {
+      const kept = todos.filter(t => !t.fromGoogle || seenByDay[key]?.has(t.gcalId));
+      if (kept.length !== todos.length) na[key] = {...na[key], todos: kept};
+    }
+    d.setDate(d.getDate() + 1);
+  }
+  return na;
+}
+
 function Sidebar({tabs, tab, setTab, syncBar}) {
   return (
     <div style={{width:240,flexShrink:0,background:A.card,borderRight:`1px solid ${A.sep}`,display:"flex",flexDirection:"column",height:"100dvh"}}>
@@ -1091,6 +1205,11 @@ export default function App() {
   const [user, setUser] = useState(null);
   const [syncStatus, setSyncStatus] = useState("idle"); // idle | syncing | synced | error
   const [authLoading, setAuthLoading] = useState(FIREBASE_CONFIGURED);
+  const [gcalToken, setGcalToken] = useState(null);
+  const [gcalEmail, setGcalEmail] = useState("");
+  const [gcalSyncing, setGcalSyncing] = useState(false);
+  const [gcalLastSync, setGcalLastSync] = useState(null);
+  const [gcalError, setGcalError] = useState("");
   const unsubSnapshotsRef = useRef([]);
   const today = todayKey();
   const isWide = useIsWide();
@@ -1278,6 +1397,72 @@ export default function App() {
     });
   }, [today]);
 
+  const syncGoogleCalendarNow = useCallback(async (tokenOverride) => {
+    const token = tokenOverride || gcalToken;
+    if (!token) return;
+    setGcalSyncing(true);
+    setGcalError("");
+    try {
+      const timeMin = new Date(); timeMin.setDate(timeMin.getDate() - GCAL_PAST_DAYS);
+      const timeMax = new Date(); timeMax.setDate(timeMax.getDate() + GCAL_FUTURE_DAYS);
+      const events = await fetchGoogleEvents(token, timeMin, timeMax);
+      const dismissed = new Set(store.get("gcal-dismissed") || []);
+      setAllDaily(prev => {
+        const na = mergeGoogleEvents(prev, events, toKey(timeMin), toKey(timeMax), dismissed);
+        store.set("all-daily", na);
+        setStreak(computeStreak(na, today));
+        return na;
+      });
+      setGcalLastSync(Date.now());
+    } catch (e) {
+      console.warn("Google Calendar sync error:", e);
+      if (String(e.message).includes("GCAL_HTTP_401")) {
+        setGcalToken(null);
+        setGcalError("Доступ к Google Calendar истёк. Подключите заново.");
+      } else {
+        setGcalError("Не удалось синхронизировать Google Calendar.");
+      }
+    } finally {
+      setGcalSyncing(false);
+    }
+  }, [gcalToken, today]);
+
+  const connectGoogleCalendar = useCallback(async () => {
+    if (!auth) return;
+    setGcalError("");
+    try {
+      const provider = new GoogleAuthProvider();
+      provider.addScope(GCAL_SCOPE);
+      const result = await signInWithPopup(auth, provider);
+      const credential = GoogleAuthProvider.credentialFromResult(result);
+      if (!credential?.accessToken) throw new Error("Нет токена доступа");
+      setGcalToken(credential.accessToken);
+      setGcalEmail(result.user?.email || "");
+      await syncGoogleCalendarNow(credential.accessToken);
+    } catch (e) {
+      console.warn("Google Calendar connect error:", e);
+      setGcalError("Не удалось подключить Google Calendar.");
+    }
+  }, [syncGoogleCalendarNow]);
+
+  const disconnectGoogleCalendar = useCallback(() => {
+    setGcalToken(null);
+    setGcalEmail("");
+    setGcalError("");
+  }, []);
+
+  const dismissGoogleEvent = useCallback((gcalId) => {
+    const dismissed = new Set(store.get("gcal-dismissed") || []);
+    dismissed.add(gcalId);
+    store.set("gcal-dismissed", [...dismissed]);
+  }, []);
+
+  // Автосинхронизация при открытии вкладки "Календарь", если Google Calendar уже подключён
+  useEffect(() => {
+    if (tab === "calendar" && gcalToken) syncGoogleCalendarNow();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab]);
+
   const tabs = [
     {id:"today",    icon:"◉", label:"Сегодня"},
     {id:"calendar", icon:"▦", label:"Календарь"},
@@ -1324,9 +1509,11 @@ export default function App() {
           <Sidebar tabs={tabs} tab={tab} setTab={setTab} syncBar={syncBar}/>
           <div style={{flex:1,overflowY:"auto"}}>
             <div style={{maxWidth:WIDE_MAXW[tab]||undefined,margin:WIDE_MAXW[tab]?"0 auto":0,padding:"0 36px 40px"}}>
-              {tab==="today"    && <TodayTab    dayData={todayData} onSave={saveToday} cycleData={cycleData} today={today} moveTask={moveTask} isWide/>}
-              {tab==="calendar" && <CalendarTab allDaily={allDaily} cycleData={cycleData} saveDayData={saveDayData} saveDayView={saveDayView} moveTask={moveTask} isWide/>}
-              {tab==="settings" && <SettingsTab cycleData={cycleData} saveCycle={saveCycle} allDaily={allDaily} streak={streak}/>}
+              {tab==="today"    && <TodayTab    dayData={todayData} onSave={saveToday} cycleData={cycleData} today={today} moveTask={moveTask} onDismissGoogle={dismissGoogleEvent} isWide/>}
+              {tab==="calendar" && <CalendarTab allDaily={allDaily} cycleData={cycleData} saveDayData={saveDayData} saveDayView={saveDayView} moveTask={moveTask} onDismissGoogle={dismissGoogleEvent} isWide/>}
+              {tab==="settings" && <SettingsTab cycleData={cycleData} saveCycle={saveCycle} allDaily={allDaily} streak={streak}
+                firebaseUser={user} gcalConnected={!!gcalToken} gcalEmail={gcalEmail} gcalSyncing={gcalSyncing} gcalLastSync={gcalLastSync} gcalError={gcalError}
+                onConnectGoogle={connectGoogleCalendar} onSyncGoogleNow={()=>syncGoogleCalendarNow()} onDisconnectGoogle={disconnectGoogleCalendar}/>}
               {tab==="finance"  && <FinanceTab isWide/>}
               {tab==="wishlist" && <WishlistTab isWide/>}
             </div>
@@ -1336,9 +1523,11 @@ export default function App() {
         <div style={{background:A.bg,height:"100dvh",maxWidth:430,margin:"0 auto",fontFamily:SF,display:"flex",flexDirection:"column"}}>
           {syncBar}
           <div style={{flex:1,overflowY:"auto",paddingBottom:84}}>
-            {tab==="today"    && <TodayTab    dayData={todayData} onSave={saveToday} cycleData={cycleData} today={today} moveTask={moveTask}/>}
-            {tab==="calendar" && <CalendarTab allDaily={allDaily} cycleData={cycleData} saveDayData={saveDayData} saveDayView={saveDayView} moveTask={moveTask}/>}
-            {tab==="settings" && <SettingsTab cycleData={cycleData} saveCycle={saveCycle} allDaily={allDaily} streak={streak}/>}
+            {tab==="today"    && <TodayTab    dayData={todayData} onSave={saveToday} cycleData={cycleData} today={today} moveTask={moveTask} onDismissGoogle={dismissGoogleEvent}/>}
+            {tab==="calendar" && <CalendarTab allDaily={allDaily} cycleData={cycleData} saveDayData={saveDayData} saveDayView={saveDayView} moveTask={moveTask} onDismissGoogle={dismissGoogleEvent}/>}
+            {tab==="settings" && <SettingsTab cycleData={cycleData} saveCycle={saveCycle} allDaily={allDaily} streak={streak}
+              firebaseUser={user} gcalConnected={!!gcalToken} gcalEmail={gcalEmail} gcalSyncing={gcalSyncing} gcalLastSync={gcalLastSync} gcalError={gcalError}
+              onConnectGoogle={connectGoogleCalendar} onSyncGoogleNow={()=>syncGoogleCalendarNow()} onDisconnectGoogle={disconnectGoogleCalendar}/>}
             {tab==="finance"  && <FinanceTab/>}
             {tab==="wishlist" && <WishlistTab/>}
           </div>
