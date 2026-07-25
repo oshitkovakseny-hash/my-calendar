@@ -90,15 +90,6 @@ function useIsWide() {
   return isWide;
 }
 
-function getScrollParent(el) {
-  let node = el?.parentElement;
-  while (node) {
-    if (/(auto|scroll)/.test(getComputedStyle(node).overflowY)) return node;
-    node = node.parentElement;
-  }
-  return document.scrollingElement || document.documentElement;
-}
-
 
 const LargeTitle = ({children,style={}}) => <div style={{fontSize:34,fontWeight:700,letterSpacing:0.37,lineHeight:"41px",fontFamily:SF,color:A.label,...style}}>{children}</div>;
 const SectionHeader = ({children,style={}}) => <div style={{fontSize:13,fontWeight:400,color:A.label2,letterSpacing:-0.08,fontFamily:SF,padding:"0 16px 6px 20px",textTransform:"uppercase",...style}}>{children}</div>;
@@ -292,7 +283,7 @@ function MonthGrid({year, month, allDaily, cycleData, todayKey, selKey, onSelect
           const todos=dd?.todos||[];
           const shown=todos.slice(0,shownLimit), extra=todos.length-shown.length;
           return (
-            <button key={key} data-daykey={key} onClick={()=>onSelect(day)} style={{minHeight:cellMinHeight,textAlign:"left",display:"flex",flexDirection:"column",gap:3,padding:"3px 3px 5px",background:isSel?A.blue+"12":"transparent",border:"none",...cellBorder,boxShadow:isSel?`inset 0 0 0 1.5px ${A.blue}`:"none",cursor:"pointer",overflow:"hidden"}}>
+            <button key={key} onClick={()=>onSelect(day)} style={{minHeight:cellMinHeight,textAlign:"left",display:"flex",flexDirection:"column",gap:3,padding:"3px 3px 5px",background:isSel?A.blue+"12":"transparent",border:"none",...cellBorder,boxShadow:isSel?`inset 0 0 0 1.5px ${A.blue}`:"none",cursor:"pointer",overflow:"hidden"}}>
               <div style={{display:"flex",alignItems:"center",gap:3,minHeight:20}}>
                 {phase&&<div title={phase.label} style={{width:5,height:5,borderRadius:"50%",background:phase.color,flexShrink:0}}/>}
                 {dd?.eating===true&&<div style={{width:5,height:5,borderRadius:"50%",background:A.green,flexShrink:0}}/>}
@@ -319,56 +310,17 @@ function MonthGrid({year, month, allDaily, cycleData, todayKey, selKey, onSelect
   );
 }
 
-const CAL_MONTH_CAP = 240; // ~20 years each direction — effectively unlimited for personal use
-const CAL_MONTH_STEP = 6;
-
 function CalendarTab({allDaily, cycleData, saveDayData, saveDayView, moveTask, isWide}) {
   const todayD = new Date();
   const baseY = todayD.getFullYear(), baseM = todayD.getMonth();
   const todayKey = toKey(todayD);
 
-  const [range, setRange] = useState({start:-3, end:3});
   const [calMonth, setCalMonth] = useState(new Date(baseY, baseM, 1));
   const [selectedDay, setSelectedDay] = useState(todayD);
-  const [jumpTick, setJumpTick] = useState(0);
-  const rootRef = useRef(null);
-  const topSentinelRef = useRef(null);
-  const bottomSentinelRef = useRef(null);
-
-  useEffect(() => {
-    if (!isWide) return;
-    const scrollEl = getScrollParent(rootRef.current);
-    const topEl = topSentinelRef.current, bottomEl = bottomSentinelRef.current;
-    if (!scrollEl || !topEl || !bottomEl) return;
-    const observer = new IntersectionObserver((entries) => {
-      entries.forEach(entry => {
-        if (!entry.isIntersecting) return;
-        if (entry.target === topEl) {
-          setRange(r => r.start <= -CAL_MONTH_CAP ? r : {...r, start: Math.max(r.start - CAL_MONTH_STEP, -CAL_MONTH_CAP)});
-        } else if (entry.target === bottomEl) {
-          setRange(r => r.end >= CAL_MONTH_CAP ? r : {...r, end: Math.min(r.end + CAL_MONTH_STEP, CAL_MONTH_CAP)});
-        }
-      });
-    }, {root: scrollEl, rootMargin: "600px 0px 600px 0px"});
-    observer.observe(topEl);
-    observer.observe(bottomEl);
-    return () => observer.disconnect();
-  }, [isWide]);
-
-  useEffect(() => {
-    if (jumpTick === 0 || !isWide) return;
-    const el = rootRef.current?.querySelector(`[data-daykey="${todayKey}"]`);
-    if (el) el.scrollIntoView({block:"center"});
-  }, [jumpTick]);
 
   const goToToday = () => {
     setSelectedDay(new Date());
-    if (isWide) {
-      setRange({start:-3, end:3});
-      setJumpTick(t => t+1);
-    } else {
-      setCalMonth(new Date(baseY, baseM, 1));
-    }
+    setCalMonth(new Date(baseY, baseM, 1));
   };
   const prevMonth = () => setCalMonth(m => new Date(m.getFullYear(), m.getMonth()-1, 1));
   const nextMonth = () => setCalMonth(m => new Date(m.getFullYear(), m.getMonth()+1, 1));
@@ -377,12 +329,6 @@ function CalendarTab({allDaily, cycleData, saveDayData, saveDayView, moveTask, i
     const [y, m] = e.target.value.split("-").map(Number);
     if (y && m) setCalMonth(new Date(y, m-1, 1));
   };
-
-  const months = [];
-  for (let off = range.start; off <= range.end; off++) {
-    const d = new Date(baseY, baseM+off, 1);
-    months.push({y: d.getFullYear(), m: d.getMonth(), key: `${d.getFullYear()}-${d.getMonth()}`});
-  }
 
   const selKey = selectedDay ? toKey(selectedDay) : null;
   const selPhase = selectedDay ? getCyclePhase(selectedDay, cycleData) : null;
@@ -410,19 +356,15 @@ function CalendarTab({allDaily, cycleData, saveDayData, saveDayView, moveTask, i
   }
 
   const weekdayHeader = (
-    <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",padding: isWide ? "0 0 6px" : "12px 10px 6px",position: isWide ? "sticky" : "static",top:0,background:A.bg,zIndex:1}}>
+    <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",padding: isWide ? "0 0 6px" : "12px 10px 6px"}}>
       {DAYS_S.map(d=><div key={d} style={{textAlign:"center",fontSize:12,fontFamily:SF,fontWeight:600,color:A.label2}}>{d}</div>)}
     </div>
   );
 
-  const monthList = (
+  const grid = (
     <>
       {weekdayHeader}
-      <div ref={topSentinelRef} style={{height:1}}/>
-      {months.map(mo => (
-        <MonthGrid key={mo.key} year={mo.y} month={mo.m} allDaily={allDaily} cycleData={cycleData} todayKey={todayKey} selKey={selKey} onSelect={setSelectedDay} isWide={isWide}/>
-      ))}
-      <div ref={bottomSentinelRef} style={{height:1}}/>
+      <MonthGrid year={calMonth.getFullYear()} month={calMonth.getMonth()} allDaily={allDaily} cycleData={cycleData} todayKey={todayKey} selKey={selKey} onSelect={setSelectedDay} isWide={isWide} showTitle={false}/>
     </>
   );
 
@@ -437,35 +379,27 @@ function CalendarTab({allDaily, cycleData, saveDayData, saveDayView, moveTask, i
   );
 
   return (
-    <div ref={rootRef} style={{paddingBottom: isWide ? 40 : 100}}>
+    <div style={{paddingBottom: isWide ? 40 : 100}}>
       <div style={{padding: isWide ? "20px 0 0" : "16px 20px 0",display:"flex",flexWrap:"wrap",rowGap:8,alignItems:"center",justifyContent:"space-between"}}>
-        {isWide ? (
-          <LargeTitle>Календарь</LargeTitle>
-        ) : (
-          <div style={{position:"relative",minWidth:0,flexShrink:1}}>
-            <LargeTitle>{MONTHS[calMonth.getMonth()]} <span style={{color:A.label2}}>{calMonth.getFullYear()}</span></LargeTitle>
-            <input type="month" value={monthInputValue} onChange={onMonthPick} aria-label="Выбрать месяц"
-              style={{position:"absolute",inset:0,opacity:0,border:"none",cursor:"pointer",width:"100%"}}/>
-          </div>
-        )}
+        <div style={{position:"relative",minWidth:0,flexShrink:1}}>
+          <LargeTitle>{MONTHS[calMonth.getMonth()]} <span style={{color:A.label2}}>{calMonth.getFullYear()}</span></LargeTitle>
+          <input type="month" value={monthInputValue} onChange={onMonthPick} aria-label="Выбрать месяц"
+            style={{position:"absolute",inset:0,opacity:0,border:"none",cursor:"pointer",width:"100%"}}/>
+        </div>
         <div style={{display:"flex",gap:8,alignItems:"center",flexShrink:0,marginLeft:"auto"}}>
-          {!isWide && <button onClick={prevMonth} style={{width:32,height:32,borderRadius:"50%",background:A.bg,border:"none",cursor:"pointer",fontSize:16,color:A.blue}}>‹</button>}
+          <button onClick={prevMonth} style={{width:32,height:32,borderRadius:"50%",background:A.bg,border:"none",cursor:"pointer",fontSize:16,color:A.blue}}>‹</button>
           <button onClick={goToToday} style={{height:32,padding:"0 14px",borderRadius:16,background:A.bg,border:"none",cursor:"pointer",fontSize:13,fontFamily:SF,fontWeight:600,color:A.blue,whiteSpace:"nowrap"}}>Сегодня</button>
-          {!isWide && <button onClick={nextMonth} style={{width:32,height:32,borderRadius:"50%",background:A.bg,border:"none",cursor:"pointer",fontSize:16,color:A.blue}}>›</button>}
+          <button onClick={nextMonth} style={{width:32,height:32,borderRadius:"50%",background:A.bg,border:"none",cursor:"pointer",fontSize:16,color:A.blue}}>›</button>
         </div>
       </div>
 
       {isWide ? (
         <div style={{display:"flex",gap:28,alignItems:"flex-start",marginTop:16}}>
-          <div style={{flex:1,minWidth:0}}>{monthList}</div>
+          <div style={{flex:1,minWidth:0}}>{grid}</div>
           <div style={{width:380,flexShrink:0,position:"sticky",top:0,maxHeight:"calc(100dvh - 24px)",overflowY:"auto"}}>{detailPanel}</div>
         </div>
       ) : (
-        <>
-          {weekdayHeader}
-          <MonthGrid year={calMonth.getFullYear()} month={calMonth.getMonth()} allDaily={allDaily} cycleData={cycleData} todayKey={todayKey} selKey={selKey} onSelect={setSelectedDay} isWide={false} showTitle={false}/>
-          {detailPanel}
-        </>
+        <>{grid}{detailPanel}</>
       )}
     </div>
   );
