@@ -938,10 +938,14 @@ function compressImage(file, maxDim = 1280, quality = 0.75) {
       const canvas = document.createElement("canvas");
       canvas.width = width; canvas.height = height;
       const ctx = canvas.getContext("2d");
+      if (!ctx) { reject(new Error("canvas 2d context unavailable")); return; }
       ctx.fillStyle = "#fff";
       ctx.fillRect(0, 0, width, height);
       ctx.drawImage(img, 0, 0, width, height);
-      resolve(canvas.toDataURL("image/jpeg", quality));
+      let dataUrl;
+      try { dataUrl = canvas.toDataURL("image/jpeg", quality); }
+      catch (e) { reject(e); return; }
+      resolve(dataUrl);
     };
     img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("image decode failed")); };
     img.src = url;
@@ -1024,13 +1028,24 @@ function WishlistTab({isWide}) {
   const pickPhoto = id => {
     const input = document.createElement("input");
     input.type = "file"; input.accept = "image/*";
+    // На iOS (особенно в режиме установленного приложения) input, не добавленный
+    // в DOM, может не открывать системный выбор фото — поэтому крепим его к странице.
+    input.style.position = "fixed";
+    input.style.top = "-9999px";
+    input.style.opacity = "0";
+    document.body.appendChild(input);
+    const cleanup = () => input.remove();
     input.onchange = e => {
-      const file = e.target.files[0]; if (!file) return;
+      const file = e.target.files[0];
+      if (!file) { cleanup(); return; }
       setUploadingId(id);
       compressImage(file)
         .then(dataUrl => updateWish(id, "photo", dataUrl))
-        .catch(() => alert("Не удалось обработать фото. Попробуйте другое изображение."))
-        .finally(() => setUploadingId(null));
+        .catch(err => {
+          console.warn("Ошибка обработки фото:", err);
+          alert("Не удалось обработать фото. Попробуйте другое изображение (или сделайте скриншот этого фото и загрузите его).");
+        })
+        .finally(() => { setUploadingId(null); cleanup(); });
     };
     input.click();
   };
