@@ -1133,6 +1133,35 @@ async function fetchGoogleEvents(accessToken, timeMin, timeMax) {
   return data.items || [];
 }
 
+function stripHtml(html) {
+  if (!html) return "";
+  return html
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/p>/gi, "\n")
+    .replace(/<[^>]+>/g, "")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .trim();
+}
+
+const URL_RE = /(https?:\/\/[^\s]+)/;
+
+// Ссылка на созвон: сначала нативные варианты конференций Google Calendar,
+// затем — первая ссылка, найденная в месте проведения или в описании.
+function extractCallLink(ev) {
+  if (ev.hangoutLink) return ev.hangoutLink;
+  const entryPoints = ev.conferenceData?.entryPoints || [];
+  const video = entryPoints.find(e => e.entryPointType === "video") || entryPoints[0];
+  if (video?.uri) return video.uri;
+  const fromLocation = ev.location?.match(URL_RE)?.[0];
+  if (fromLocation) return fromLocation;
+  const fromDescription = ev.description?.match(URL_RE)?.[0];
+  if (fromDescription) return fromDescription;
+  return "";
+}
+
 // Однонаправленный импорт: события Google Calendar кладём в allDaily как задачи
 // с меткой fromGoogle+gcalId. Ничего из allDaily обратно в Google не пишем.
 function mergeGoogleEvents(prevAllDaily, events, rangeStartKey, rangeEndKey, dismissedIds) {
@@ -1152,13 +1181,16 @@ function mergeGoogleEvents(prevAllDaily, events, rangeStartKey, rangeEndKey, dis
     const timeLabel = ev.start?.dateTime
       ? new Date(ev.start.dateTime).toLocaleTimeString("ru-RU", {hour:"2-digit", minute:"2-digit"})
       : "Весь день";
+    const callLink = extractCallLink(ev);
+    const description = stripHtml(ev.description);
+    const location = ev.location && (!callLink || !ev.location.includes(callLink)) ? ev.location : "";
     const task = {
       id: idx >= 0 ? todos[idx].id : `gcal-${ev.id}`,
       text: ev.summary || "Без названия",
       done: idx >= 0 ? todos[idx].done : false,
       tag: idx >= 0 ? todos[idx].tag : null,
-      note: [timeLabel, ev.location].filter(Boolean).join(" · "),
-      link: ev.htmlLink || "",
+      note: [timeLabel, description, location].filter(Boolean).join(" · "),
+      link: callLink,
       gcalId: ev.id,
       fromGoogle: true,
     };
