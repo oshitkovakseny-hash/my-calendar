@@ -1122,7 +1122,13 @@ async function fetchGoogleEvents(accessToken, timeMin, timeMax) {
   const res = await fetch(`https://www.googleapis.com/calendar/v3/calendars/primary/events?${params}`, {
     headers: { Authorization: `Bearer ${accessToken}` },
   });
-  if (!res.ok) throw new Error(`GCAL_HTTP_${res.status}`);
+  if (!res.ok) {
+    let detail = "";
+    try { const errBody = await res.json(); detail = errBody?.error?.message || ""; } catch {}
+    const err = new Error(`GCAL_HTTP_${res.status}${detail ? ": " + detail : ""}`);
+    err.status = res.status;
+    throw err;
+  }
   const data = await res.json();
   return data.items || [];
 }
@@ -1416,11 +1422,13 @@ export default function App() {
       setGcalLastSync(Date.now());
     } catch (e) {
       console.warn("Google Calendar sync error:", e);
-      if (String(e.message).includes("GCAL_HTTP_401")) {
+      if (e.status === 401) {
         setGcalToken(null);
         setGcalError("Доступ к Google Calendar истёк. Подключите заново.");
+      } else if (e.status === 403) {
+        setGcalError("Google Calendar API недоступен (403). Скорее всего, он не включён в Google Cloud Console, либо не выдано разрешение на чтение календаря. " + (e.message.split(": ").slice(1).join(": ") || ""));
       } else {
-        setGcalError("Не удалось синхронизировать Google Calendar.");
+        setGcalError(`Не удалось синхронизировать Google Calendar${e.status ? ` (код ${e.status})` : ""}. ${e.message.split(": ").slice(1).join(": ") || ""}`);
       }
     } finally {
       setGcalSyncing(false);
