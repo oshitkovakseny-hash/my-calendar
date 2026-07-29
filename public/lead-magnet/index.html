@@ -127,24 +127,7 @@
   }
   .form-card h2{margin-bottom:8px;}
   .form-card p.section-lead{margin:0 auto 26px;}
-  form.lead-form{display:flex;flex-direction:column;gap:12px;text-align:left;}
-  .field label{display:block;font-size:13px;font-weight:700;margin-bottom:6px;color:var(--ink-soft);}
-  .field input{
-    width:100%;padding:14px 16px;border-radius:12px;border:1.5px solid var(--line);
-    font-size:16px;font-family:inherit;background:var(--bg);
-  }
-  .field input:focus{outline:none;border-color:var(--green-dark);}
-  .hp{position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden;}
-  .form-note{font-size:12.5px;color:var(--ink-soft);margin-top:2px;}
-  .form-error{color:#c0392b;font-size:13.5px;display:none;}
-  .form-error.show{display:block;}
-
-  .success-block{display:none;text-align:center;}
-  .success-block.show{display:block;}
-  .success-block .emoji{font-size:44px;margin-bottom:10px;}
-  .success-block h3{font-size:22px;margin:0 0 10px;}
-  .success-block p{color:var(--ink-soft);margin:0 0 22px;}
-  .success-actions{display:flex;flex-direction:column;gap:12px;}
+  .getcourse-widget{min-height:280px;}
 
   footer{padding:40px 0 60px;}
   footer .wrap{display:flex;flex-wrap:wrap;gap:16px;justify-content:space-between;align-items:center;border-top:1px solid var(--line);padding-top:28px;font-size:14px;color:var(--ink-soft);}
@@ -277,34 +260,11 @@
   <section class="get-guide" id="get-guide">
     <div class="wrap">
       <div class="form-card">
-        <div id="form-state">
-          <span class="pill">Бесплатно</span>
-          <h2 style="margin-top:14px;">Заберите гайд прямо сейчас</h2>
-          <p class="section-lead">Оставьте имя и контакт — пришлём гайд «Как выбирать дополнительные занятия, которые подходят моему ребёнку» и ссылку на скачивание откроется сразу же.</p>
-          <form class="lead-form" id="lead-form">
-            <input class="hp" type="text" name="company" tabindex="-1" autocomplete="off" />
-            <div class="field">
-              <label for="lf-name">Ваше имя</label>
-              <input id="lf-name" name="name" type="text" required placeholder="Как к вам обращаться" />
-            </div>
-            <div class="field">
-              <label for="lf-contact">Email или Telegram</label>
-              <input id="lf-contact" name="contact" type="text" required placeholder="you@mail.com или @username" />
-            </div>
-            <div class="form-error" id="lf-error">Пожалуйста, заполните имя и контакт.</div>
-            <button type="submit" class="btn btn-primary btn-block" id="lf-submit">Получить гайд бесплатно</button>
-            <div class="form-note">Нажимая кнопку, вы соглашаетесь на обработку данных для отправки гайда. Спам не рассылаем.</div>
-          </form>
-        </div>
-
-        <div class="success-block" id="success-block">
-          <div class="emoji">🎉</div>
-          <h3>Готово! Ваш гайд ждёт вас</h3>
-          <p>Скачивание должно начаться автоматически. Если этого не произошло — нажмите на кнопку ниже.</p>
-          <div class="success-actions">
-            <a class="btn btn-primary btn-block" id="download-link" href="/lead-magnet/kak-vybirat-zanyatiya-edpower.pdf" download>⬇️ Скачать гайд PDF</a>
-            <a class="btn btn-secondary btn-block" href="https://school.polina-education.ru/diagnostika" target="_blank" rel="noopener">💬 Записаться на бесплатную диагностику</a>
-          </div>
+        <span class="pill">Бесплатно</span>
+        <h2 style="margin-top:14px;">Заберите гайд прямо сейчас</h2>
+        <p class="section-lead">Оставьте имя и контакт в форме ниже — пришлём гайд «Как выбирать дополнительные занятия, которые подходят моему ребёнку».</p>
+        <div class="getcourse-widget">
+          <script id="c19b58b7d8542c7a1f072e29249c27991ab42d31" src="https://school.polina-education.ru/pl/lite/widget/script?id=1636261"></script>
         </div>
       </div>
     </div>
@@ -320,62 +280,6 @@
     </div>
   </div>
 </footer>
-
-<script type="module">
-  const form = document.getElementById('lead-form');
-  const errorEl = document.getElementById('lf-error');
-  const submitBtn = document.getElementById('lf-submit');
-  const formState = document.getElementById('form-state');
-  const successBlock = document.getElementById('success-block');
-  const downloadLink = document.getElementById('download-link');
-
-  async function saveLeadBestEffort(name, contact) {
-    try {
-      const { initializeApp } = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js');
-      const { getFirestore, collection, addDoc, serverTimestamp } = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js');
-      const firebaseConfig = {
-        apiKey: "AIzaSyDhfu5fKnbaTA2aZYR7lekcSyEK0GbuYPQ",
-        authDomain: "my-calendar-sync-b88cd.firebaseapp.com",
-        projectId: "my-calendar-sync-b88cd",
-        storageBucket: "my-calendar-sync-b88cd.firebasestorage.app",
-        messagingSenderId: "965264661098",
-        appId: "1:965264661098:web:98e1708bb97f84f8288813",
-      };
-      const app = initializeApp(firebaseConfig);
-      const db = getFirestore(app);
-      await addDoc(collection(db, "leadMagnetLeads"), {
-        name, contact,
-        source: "lead-magnet-landing",
-        createdAt: serverTimestamp(),
-      });
-    } catch (e) {
-      console.warn("Lead save skipped (best effort):", e.message);
-    }
-  }
-
-  form.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const data = new FormData(form);
-    const company = (data.get('company') || '').toString().trim();
-    if (company) return; // honeypot triggered, silently ignore
-    const name = (data.get('name') || '').toString().trim();
-    const contact = (data.get('contact') || '').toString().trim();
-
-    if (!name || !contact) {
-      errorEl.classList.add('show');
-      return;
-    }
-    errorEl.classList.remove('show');
-    submitBtn.disabled = true;
-    submitBtn.textContent = 'Отправляем...';
-
-    await saveLeadBestEffort(name, contact);
-
-    formState.style.display = 'none';
-    successBlock.classList.add('show');
-    downloadLink.click();
-  });
-</script>
 
 </body>
 </html>
