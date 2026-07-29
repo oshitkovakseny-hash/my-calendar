@@ -1,0 +1,381 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Бесплатный гайд: как выбрать кружки и секции для ребёнка | EdPower</title>
+<meta name="description" content="Бесплатный гайд от Полины Мальцевой и EdPower: 5 критериев выбора дополнительных занятий для ребёнка. Заберите гайд и запишитесь на бесплатную диагностику развития ребёнка." />
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎨</text></svg>" />
+<style>
+  :root{
+    --bg:#FBF8F0;
+    --ink:#20241a;
+    --ink-soft:rgba(32,36,26,0.68);
+    --green:#c7de7a;
+    --green-dark:#7a9a2e;
+    --pink:#f6d7d3;
+    --coral:#f0a98d;
+    --card:#ffffff;
+    --line:rgba(32,36,26,0.12);
+    --radius:22px;
+    --maxw:1080px;
+  }
+  *{box-sizing:border-box;}
+  html{scroll-behavior:smooth;}
+  body{
+    margin:0;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+    background:var(--bg);
+    color:var(--ink);
+    line-height:1.5;
+  }
+  img{max-width:100%;display:block;}
+  a{color:inherit;}
+  .wrap{max-width:var(--maxw);margin:0 auto;padding:0 24px;}
+
+  header.site-header{
+    padding:20px 0;
+  }
+  header.site-header .wrap{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;}
+  .logo{font-weight:800;font-size:20px;letter-spacing:0.02em;}
+  .logo span{color:var(--green-dark);}
+  .header-links{display:flex;gap:18px;font-size:14px;font-weight:600;}
+  .header-links a{text-decoration:none;border-bottom:2px solid var(--green);}
+
+  .pill{
+    display:inline-block;
+    background:var(--green);
+    color:#2b3a12;
+    font-weight:800;
+    font-size:13px;
+    letter-spacing:0.04em;
+    text-transform:uppercase;
+    padding:8px 18px;
+    border-radius:999px;
+  }
+
+  .hero{padding:28px 0 56px;}
+  .hero .wrap{display:grid;grid-template-columns:1.1fr 0.9fr;gap:48px;align-items:center;}
+  .hero h1{font-size:clamp(28px,4vw,46px);line-height:1.15;margin:18px 0 18px;font-weight:800;}
+  .hero h1 em{font-style:normal;background:linear-gradient(transparent 60%, var(--green) 60%);}
+  .hero p.lead{font-size:18px;color:var(--ink-soft);margin:0 0 28px;max-width:52ch;}
+  .hero-figure{position:relative;}
+  .hero-figure::before{
+    content:"";position:absolute;inset:6% 8%;background:var(--pink);
+    border-radius:50% 45% 55% 50%/55% 50% 50% 45%;z-index:0;
+  }
+  .hero-figure img{position:relative;z-index:1;border-radius:var(--radius);width:100%;}
+
+  .cta-row{display:flex;gap:14px;flex-wrap:wrap;}
+  .btn{
+    display:inline-flex;align-items:center;gap:8px;
+    padding:16px 26px;border-radius:16px;font-weight:800;font-size:16px;
+    text-decoration:none;border:none;cursor:pointer;transition:transform .15s ease, box-shadow .15s ease;
+  }
+  .btn:hover{transform:translateY(-2px);}
+  .btn-primary{background:var(--ink);color:#fff;box-shadow:0 10px 24px -12px rgba(32,36,26,0.6);}
+  .btn-secondary{background:#fff;color:var(--ink);border:2px solid var(--ink);}
+  .btn-block{width:100%;justify-content:center;}
+  .btn[disabled]{opacity:0.6;cursor:default;transform:none;}
+
+  section{padding:56px 0;}
+  h2{font-size:clamp(24px,3.2vw,34px);font-weight:800;margin:0 0 14px;}
+  .section-lead{color:var(--ink-soft);font-size:17px;max-width:64ch;margin:0 0 32px;}
+
+  .pain{background:var(--card);border-top:1px solid var(--line);border-bottom:1px solid var(--line);}
+  .pain-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:16px;}
+  .pain-item{
+    display:flex;gap:12px;padding:18px 20px;background:var(--bg);border-radius:16px;font-size:15.5px;
+  }
+  .pain-item .mark{font-size:20px;line-height:1;flex:none;}
+
+  .criteria-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:18px;}
+  .crit-card{
+    background:var(--card);border:1px solid var(--line);border-radius:var(--radius);
+    padding:24px;position:relative;
+  }
+  .crit-num{
+    display:inline-flex;align-items:center;justify-content:center;
+    width:36px;height:36px;border-radius:50%;background:var(--green);
+    font-weight:800;font-size:16px;margin-bottom:14px;
+  }
+  .crit-card h3{font-size:17px;margin:0 0 8px;}
+  .crit-card p{margin:0;color:var(--ink-soft);font-size:14.5px;}
+
+  .author{background:var(--card);border-top:1px solid var(--line);border-bottom:1px solid var(--line);}
+  .author .wrap{display:grid;grid-template-columns:0.8fr 1.2fr;gap:40px;align-items:center;}
+  .author-figure{border-radius:var(--radius);overflow:hidden;background:var(--green);}
+  .author ul{margin:18px 0;padding:0;list-style:none;}
+  .author li{display:flex;gap:10px;margin-bottom:10px;font-size:15px;}
+  .author li .mark{color:var(--green-dark);font-weight:800;flex:none;}
+
+  .diagnostic-banner{
+    background:var(--ink);color:#fff;border-radius:var(--radius);
+    margin:0 auto;max-width:calc(var(--maxw) - 0px);
+  }
+  .diagnostic-banner .inner{
+    padding:44px 40px;display:grid;grid-template-columns:1.3fr 0.7fr;gap:32px;align-items:center;
+  }
+  .diagnostic-banner h2{color:#fff;}
+  .diagnostic-banner p{color:rgba(255,255,255,0.78);font-size:16px;max-width:52ch;}
+  .diagnostic-banner .btn-primary{background:var(--green);color:#20241a;}
+
+  .get-guide{scroll-margin-top:20px;}
+  .form-card{
+    background:var(--card);border:1px solid var(--line);border-radius:var(--radius);
+    padding:36px;max-width:560px;margin:0 auto;text-align:center;
+  }
+  .form-card h2{margin-bottom:8px;}
+  .form-card p.section-lead{margin:0 auto 26px;}
+  form.lead-form{display:flex;flex-direction:column;gap:12px;text-align:left;}
+  .field label{display:block;font-size:13px;font-weight:700;margin-bottom:6px;color:var(--ink-soft);}
+  .field input{
+    width:100%;padding:14px 16px;border-radius:12px;border:1.5px solid var(--line);
+    font-size:16px;font-family:inherit;background:var(--bg);
+  }
+  .field input:focus{outline:none;border-color:var(--green-dark);}
+  .hp{position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden;}
+  .form-note{font-size:12.5px;color:var(--ink-soft);margin-top:2px;}
+  .form-error{color:#c0392b;font-size:13.5px;display:none;}
+  .form-error.show{display:block;}
+
+  .success-block{display:none;text-align:center;}
+  .success-block.show{display:block;}
+  .success-block .emoji{font-size:44px;margin-bottom:10px;}
+  .success-block h3{font-size:22px;margin:0 0 10px;}
+  .success-block p{color:var(--ink-soft);margin:0 0 22px;}
+  .success-actions{display:flex;flex-direction:column;gap:12px;}
+
+  footer{padding:40px 0 60px;}
+  footer .wrap{display:flex;flex-wrap:wrap;gap:16px;justify-content:space-between;align-items:center;border-top:1px solid var(--line);padding-top:28px;font-size:14px;color:var(--ink-soft);}
+  footer a{text-decoration:none;font-weight:700;color:var(--ink);}
+
+  @media (max-width: 860px){
+    .hero .wrap{grid-template-columns:1fr;}
+    .hero-figure{order:-1;max-width:340px;margin:0 auto;}
+    .pain-grid{grid-template-columns:1fr;}
+    .author .wrap{grid-template-columns:1fr;}
+    .author-figure{max-width:260px;margin:0 auto;}
+    .diagnostic-banner .inner{grid-template-columns:1fr;padding:32px 24px;text-align:center;}
+    .diagnostic-banner .btn{width:100%;justify-content:center;}
+  }
+</style>
+</head>
+<body>
+
+<header class="site-header">
+  <div class="wrap">
+    <div class="logo">Ed<span>Power</span></div>
+    <div class="header-links">
+      <a href="https://www.polina-education.ru" target="_blank" rel="noopener">Сайт</a>
+      <a href="https://www.instagram.com/polina_education/" target="_blank" rel="noopener">@polina_education</a>
+    </div>
+  </div>
+</header>
+
+<main>
+  <section class="hero">
+    <div class="wrap">
+      <div>
+        <span class="pill">Бесплатный гайд</span>
+        <h1>Как выбирать кружки и секции, которые <em>правда подходят</em> вашему ребёнку</h1>
+        <p class="lead">Практическое руководство от Полины Мальцевой и команды EdPower: 5 критериев, которые помогут перестать выбирать занятия наугад — и наконец собрать для ребёнка развитие без слитых денег, брошенных через месяц кружков и разочарований.</p>
+        <div class="cta-row">
+          <a href="#get-guide" class="btn btn-primary">🎁 Забрать гайд бесплатно</a>
+          <a href="https://school.polina-education.ru/diagnostika" target="_blank" rel="noopener" class="btn btn-secondary">💬 Бесплатная диагностика ребёнка</a>
+        </div>
+      </div>
+      <div class="hero-figure">
+        <img src="/lead-magnet/images/hero-girl.jpg" alt="Ребёнок на дополнительных занятиях" />
+      </div>
+    </div>
+  </section>
+
+  <section class="pain">
+    <div class="wrap">
+      <h2>Знакомая ситуация?</h2>
+      <p class="section-lead">Кружков, секций и студий вокруг — десятки. А ясности, что из этого действительно нужно вашему ребёнку, — нет.</p>
+      <div class="pain-grid">
+        <div class="pain-item"><span class="mark">😵‍💫</span><span>Глаза разбегаются от количества вариантов, и вы выбираете по принципу «попробуем, вдруг понравится»</span></div>
+        <div class="pain-item"><span class="mark">💸</span><span>Ребёнок бросает занятия через месяц — а деньги, время и силы уже потрачены</span></div>
+        <div class="pain-item"><span class="mark">🙋</span><span>Записываете ребёнка туда, куда ходят дети подруг, а не туда, где ему действительно нужно развиваться</span></div>
+        <div class="pain-item"><span class="mark">❓</span><span>Не понимаете, что уже закрыто садом и школой, а какие направления развития — нет</span></div>
+        <div class="pain-item"><span class="mark">🎭</span><span>Кажется, что кружок «для галочки» — а реальной пользы для развития ребёнка почти нет</span></div>
+        <div class="pain-item"><span class="mark">🤯</span><span>Каждый новый учебный год выбор занятий превращается в стресс заново</span></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="criteria">
+    <div class="wrap">
+      <h2>Что внутри гайда</h2>
+      <p class="section-lead">5 критериев, по которым мы рекомендуем выбирать дополнительные занятия — с разбором и примерами для каждого.</p>
+      <div class="criteria-grid">
+        <div class="crit-card">
+          <div class="crit-num">1</div>
+          <h3>Элементы образовательной стратегии</h3>
+          <p>Какие знания, навыки и качества важно развивать вне сада и школы — и что из этого сейчас не закрыто.</p>
+        </div>
+        <div class="crit-card">
+          <div class="crit-num">2</div>
+          <h3>Сколько элементов закрывает занятие</h3>
+          <p>Как находить «ёмкие» занятия, которые развивают сразу несколько направлений — и экономят ваше время и бюджет.</p>
+        </div>
+        <div class="crit-card">
+          <div class="crit-num">3</div>
+          <h3>Условия и ограничения семьи</h3>
+          <p>Как учитывать бюджет, время, транспорт и другие ограничения при выборе — без универсальных правил «как у всех».</p>
+        </div>
+        <div class="crit-card">
+          <div class="crit-num">4</div>
+          <h3>Эффективность занятий</h3>
+          <p>Как понять, что методика педагога действительно работает, а не создаёт видимость пользы.</p>
+        </div>
+        <div class="crit-card">
+          <div class="crit-num">5</div>
+          <h3>Позиция ребёнка</h3>
+          <p>Как постепенно передавать ребёнку право выбора — с учётом возраста — и сохранить его мотивацию.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="author">
+    <div class="wrap">
+      <div class="author-figure">
+        <img src="/lead-magnet/images/polina.jpg" alt="Полина Мальцева" />
+      </div>
+      <div>
+        <span class="pill">Автор гайда</span>
+        <h2 style="margin-top:14px;">Полина Мальцева и команда EdPower</h2>
+        <ul>
+          <li><span class="mark">✓</span> Автор курса про детское развитие, который прошли более 10 000 семей</li>
+          <li><span class="mark">✓</span> Руководила созданием школы «Летово» — одной из ведущих школ России</li>
+          <li><span class="mark">✓</span> Стратегический директор школы и сада «МИР» (Доброград, Россия) и ISL (Лимассол, Кипр)</li>
+          <li><span class="mark">✓</span> 4 высших образования: Harvard (MBA), London School of Economics, University of London, НИУ ВШЭ</li>
+          <li><span class="mark">✓</span> Спикер и автор статей: Forbes, «Эхо Москвы», Edcrunch, «Коммерсантъ», «Умная Москва» и другие</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="wrap">
+      <div class="diagnostic-banner">
+        <div class="inner">
+          <div>
+            <span class="pill" style="background:#2c3a1c;color:var(--green);">Индивидуально</span>
+            <h2 style="margin-top:14px;">Хотите точечные рекомендации для своего ребёнка?</h2>
+            <p>Запишитесь на бесплатную диагностику развития ребёнка: задайте любой вопрос о своём ребёнке нашему умному боту и, при необходимости, свяжитесь напрямую с консультантом EdPower.</p>
+          </div>
+          <a href="https://school.polina-education.ru/diagnostika" target="_blank" rel="noopener" class="btn btn-primary btn-block">Пройти диагностику →</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="get-guide" id="get-guide">
+    <div class="wrap">
+      <div class="form-card">
+        <div id="form-state">
+          <span class="pill">Бесплатно</span>
+          <h2 style="margin-top:14px;">Заберите гайд прямо сейчас</h2>
+          <p class="section-lead">Оставьте имя и контакт — пришлём гайд «Как выбирать дополнительные занятия, которые подходят моему ребёнку» и ссылку на скачивание откроется сразу же.</p>
+          <form class="lead-form" id="lead-form">
+            <input class="hp" type="text" name="company" tabindex="-1" autocomplete="off" />
+            <div class="field">
+              <label for="lf-name">Ваше имя</label>
+              <input id="lf-name" name="name" type="text" required placeholder="Как к вам обращаться" />
+            </div>
+            <div class="field">
+              <label for="lf-contact">Email или Telegram</label>
+              <input id="lf-contact" name="contact" type="text" required placeholder="you@mail.com или @username" />
+            </div>
+            <div class="form-error" id="lf-error">Пожалуйста, заполните имя и контакт.</div>
+            <button type="submit" class="btn btn-primary btn-block" id="lf-submit">Получить гайд бесплатно</button>
+            <div class="form-note">Нажимая кнопку, вы соглашаетесь на обработку данных для отправки гайда. Спам не рассылаем.</div>
+          </form>
+        </div>
+
+        <div class="success-block" id="success-block">
+          <div class="emoji">🎉</div>
+          <h3>Готово! Ваш гайд ждёт вас</h3>
+          <p>Скачивание должно начаться автоматически. Если этого не произошло — нажмите на кнопку ниже.</p>
+          <div class="success-actions">
+            <a class="btn btn-primary btn-block" id="download-link" href="/lead-magnet/kak-vybirat-zanyatiya-edpower.pdf" download>⬇️ Скачать гайд PDF</a>
+            <a class="btn btn-secondary btn-block" href="https://school.polina-education.ru/diagnostika" target="_blank" rel="noopener">💬 Записаться на бесплатную диагностику</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <div>© EdPower · Полина Мальцева</div>
+    <div style="display:flex;gap:18px;">
+      <a href="https://www.polina-education.ru" target="_blank" rel="noopener">polina-education.ru</a>
+      <a href="https://www.instagram.com/polina_education/" target="_blank" rel="noopener">Instagram</a>
+    </div>
+  </div>
+</footer>
+
+<script type="module">
+  const form = document.getElementById('lead-form');
+  const errorEl = document.getElementById('lf-error');
+  const submitBtn = document.getElementById('lf-submit');
+  const formState = document.getElementById('form-state');
+  const successBlock = document.getElementById('success-block');
+  const downloadLink = document.getElementById('download-link');
+
+  async function saveLeadBestEffort(name, contact) {
+    try {
+      const { initializeApp } = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js');
+      const { getFirestore, collection, addDoc, serverTimestamp } = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js');
+      const firebaseConfig = {
+        apiKey: "AIzaSyDhfu5fKnbaTA2aZYR7lekcSyEK0GbuYPQ",
+        authDomain: "my-calendar-sync-b88cd.firebaseapp.com",
+        projectId: "my-calendar-sync-b88cd",
+        storageBucket: "my-calendar-sync-b88cd.firebasestorage.app",
+        messagingSenderId: "965264661098",
+        appId: "1:965264661098:web:98e1708bb97f84f8288813",
+      };
+      const app = initializeApp(firebaseConfig);
+      const db = getFirestore(app);
+      await addDoc(collection(db, "leadMagnetLeads"), {
+        name, contact,
+        source: "lead-magnet-landing",
+        createdAt: serverTimestamp(),
+      });
+    } catch (e) {
+      console.warn("Lead save skipped (best effort):", e.message);
+    }
+  }
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const data = new FormData(form);
+    const company = (data.get('company') || '').toString().trim();
+    if (company) return; // honeypot triggered, silently ignore
+    const name = (data.get('name') || '').toString().trim();
+    const contact = (data.get('contact') || '').toString().trim();
+
+    if (!name || !contact) {
+      errorEl.classList.add('show');
+      return;
+    }
+    errorEl.classList.remove('show');
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Отправляем...';
+
+    await saveLeadBestEffort(name, contact);
+
+    formState.style.display = 'none';
+    successBlock.classList.add('show');
+    downloadLink.click();
+  });
+</script>
+
+</body>
+</html>
