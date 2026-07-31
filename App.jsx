@@ -387,6 +387,13 @@ function CalendarTab({allDaily, cycleData, saveDayData, saveDayView, moveTask, i
         {selPhase&&<span style={{fontSize:13,fontFamily:SF,fontWeight:500,color:selPhase.color}}>{selPhase.label} · день {selPhase.day}</span>}
       </div>
       <div style={{padding: isWide ? "8px 0 0" : "8px 16px 0"}}><TaskList dayData={selData} onSave={selKey<=todayKey ? d=>saveDayView(selKey,d) : d=>saveDayData(selKey,d)} currentKey={selKey} onMoveTask={moveTask} onDismissGoogle={onDismissGoogle}/></div>
+      <div style={{padding: isWide ? "20px 0 0" : "20px 16px 0"}}>
+        <SectionHeader>Заметки дня</SectionHeader>
+        <Card>
+          <textarea value={selData.notes||""} onChange={e=>(selKey<=todayKey ? saveDayView(selKey,{...selData,notes:e.target.value}) : saveDayData(selKey,{...selData,notes:e.target.value}))} placeholder="Мысли, идеи, наблюдения..." rows={isWide?10:4}
+            style={{width:"100%",border:"none",background:"transparent",padding:"12px 16px",fontSize:17,fontFamily:SF,color:A.label,resize:"none",boxSizing:"border-box",letterSpacing:-0.41,lineHeight:"22px",outline:"none"}}/>
+        </Card>
+      </div>
     </div>
   );
 
